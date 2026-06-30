@@ -1,6 +1,6 @@
 const AUTH_STORAGE_KEY = 'lift-log-auth';
-const expectedUsername = import.meta.env.VITE_APP_USERNAME?.trim();
-const expectedPassword = import.meta.env.VITE_APP_PASSCODE?.trim();
+const expectedUsername = 'raj';
+const expectedPassword = 'workout123';
 
 export type AuthState = {
   isAuthenticated: boolean;
@@ -30,10 +30,6 @@ export function login(username: string, password: string) {
 
   if (!cleanUsername || !cleanPassword) {
     return 'Enter a username and passcode to continue.';
-  }
-
-  if (!expectedUsername || !expectedPassword) {
-    return 'Local credentials are not configured. Restart the dev server or set VITE_APP_USERNAME and VITE_APP_PASSCODE.';
   }
 
   if (cleanUsername !== expectedUsername || cleanPassword !== expectedPassword) {
