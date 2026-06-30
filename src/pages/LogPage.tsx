@@ -210,6 +210,7 @@ export function LogPage() {
       saveAppData(nextData);
       setImportMessage(`Imported ${importedSessions.length} session(s).`);
       setSelectedDate(importedSessions[0].date);
+      setSelectedDay(importedSessions[0].day);
       setIsImportModalOpen(false);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'That spreadsheet could not be imported.');
