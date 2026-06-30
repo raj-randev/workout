@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { DAYS } from '../data/days';
+import { importWorkbook } from '../import';
 import { addCustomExercise, createSessionDraft, deleteSession, findSession, loadAppData, removeCustomExercise, saveAppData } from '../storage';
-import type { AppData, CustomExercise, DayName, Session, SetEntry } from '../types';
+import type { AppData, DayName, Session, SetEntry } from '../types';
 
 const dayNames: DayName[] = ['Lower A', 'Upper A', 'Lower B', 'Upper B'];
 
@@ -11,6 +12,33 @@ function formatDate(date: Date) {
 
 function compareSessionDate(a: Session, b: Session) {
   return a.date.localeCompare(b.date);
+}
+
+function mergeImportedSessions(existing: AppData, imported: Session[]) {
+  const mergedSessions = [...existing.sessions];
+
+  imported.forEach((incoming) => {
+    const existingIndex = mergedSessions.findIndex((session) => session.date === incoming.date && session.day === incoming.day);
+    if (existingIndex === -1) {
+      mergedSessions.push(incoming);
+      return;
+    }
+
+    const target = mergedSessions[existingIndex];
+    incoming.entries.forEach((entry) => {
+      const existingEntry = target.entries.find((item) => item.exercise === entry.exercise);
+      if (existingEntry) {
+        existingEntry.sets.push(...entry.sets);
+      } else {
+        target.entries.push(entry);
+      }
+    });
+  });
+
+  return {
+    ...existing,
+    sessions: mergedSessions.sort((a, b) => a.date.localeCompare(b.date)),
+  };
 }
 
 function getLastSessionForExercise(exercise: string, day: DayName, date: string, data: AppData) {
@@ -56,6 +84,9 @@ export function LogPage() {
   const [customForm, setCustomForm] = useState({ name: '', day: 'Lower A' as DayName, sets: 3, reps: '10–12' });
   const [customError, setCustomError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loaded = loadAppData();
@@ -160,6 +191,31 @@ export function LogPage() {
     saveAppData(nextData);
   }
 
+  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportError(null);
+    setImportMessage('Importing spreadsheet…');
+
+    try {
+      const importedSessions = await importWorkbook(file);
+      if (!importedSessions.length) {
+        setImportError('No workout rows were found in that file.');
+        return;
+      }
+
+      const nextData = mergeImportedSessions(appData, importedSessions);
+      setAppData(nextData);
+      saveAppData(nextData);
+      setImportMessage(`Imported ${importedSessions.length} session(s).`);
+      setSelectedDate(importedSessions[0].date);
+      setIsImportModalOpen(false);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'That spreadsheet could not be imported.');
+    }
+  }
+
   function copyForClaude() {
     if (!draftSession) return;
     const priorSession = appData.sessions
@@ -221,9 +277,14 @@ export function LogPage() {
       </div>
 
       <div className="controls-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <button type="button" className="button-primary" onClick={showCustomModal}>
-          Add custom exercise
-        </button>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button type="button" className="button-primary" onClick={showCustomModal}>
+            Add custom exercise
+          </button>
+          <button type="button" className="button-pill" onClick={() => { setImportError(null); setImportMessage(null); setIsImportModalOpen(true); }}>
+            Import spreadsheet
+          </button>
+        </div>
         {editingSavedSession && (
           <button type="button" className="button-pill" onClick={removeSession}>
             Delete session
@@ -384,6 +445,23 @@ export function LogPage() {
               </button>
               <button type="button" className="button-primary" onClick={submitCustomExercise}>
                 Save exercise
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isImportModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-panel">
+            <h3>Import spreadsheet</h3>
+            <p className="login-copy">Upload an .xlsx, .xls, or .csv file. The importer looks for date, day, exercise, weight, reps, and effort columns.</p>
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} />
+            {importError && <div className="small-text" style={{ color: 'var(--avoid)' }}>{importError}</div>}
+            {importMessage && <div className="small-text" style={{ color: 'var(--ok)' }}>{importMessage}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '18px' }}>
+              <button type="button" className="button-pill" onClick={() => setIsImportModalOpen(false)}>
+                Close
               </button>
             </div>
           </div>

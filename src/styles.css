@@ -32,6 +32,38 @@ textarea {
   font: inherit;
 }
 
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(460px, 100%);
+  background: #f7f6f2;
+  color: #1f2530;
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 24px 100px rgba(0, 0, 0, 0.24);
+}
+
+.login-copy {
+  color: #6a7180;
+  margin-top: 6px;
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.login-error {
+  color: var(--avoid);
+  font-weight: 600;
+}
+
 button {
   cursor: pointer;
 }
@@ -225,6 +257,13 @@ label {
   padding: 14px 18px;
   border-radius: 14px;
   font-weight: 700;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 @media (min-width: 640px) {
