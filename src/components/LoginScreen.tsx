@@ -13,7 +13,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     event.preventDefault();
     const ok = onLogin(username, password);
     if (!ok) {
-      setError('Please enter a name and passcode to continue.');
+      setError('That username or passcode is not accepted.');
       return;
     }
     setError(null);
@@ -24,7 +24,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="login-card">
         <p className="eyebrow">Lift Log</p>
         <h1>Welcome back</h1>
-        <p className="login-copy">Use a simple local passcode to open your training journal.</p>
+        <p className="login-copy">Use the fixed credentials saved in your local environment file.</p>
 
         <form onSubmit={handleSubmit} className="login-form">
           <label>
@@ -32,7 +32,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="e.g. Raj"
+              placeholder="Enter your username"
             />
           </label>
           <label>
@@ -41,7 +41,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter any passcode"
+              placeholder="Enter your passcode"
             />
           </label>
           {error && <div className="login-error">{error}</div>}

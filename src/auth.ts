@@ -1,4 +1,6 @@
 const AUTH_STORAGE_KEY = 'lift-log-auth';
+const expectedUsername = import.meta.env.VITE_APP_USERNAME?.trim();
+const expectedPassword = import.meta.env.VITE_APP_PASSCODE?.trim();
 
 export type AuthState = {
   isAuthenticated: boolean;
@@ -27,6 +29,14 @@ export function login(username: string, password: string) {
   const cleanPassword = password.trim();
 
   if (!cleanUsername || !cleanPassword) {
+    return false;
+  }
+
+  if (!expectedUsername || !expectedPassword) {
+    return false;
+  }
+
+  if (cleanUsername !== expectedUsername || cleanPassword !== expectedPassword) {
     return false;
   }
 
