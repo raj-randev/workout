@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 interface LoginScreenProps {
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (username: string, password: string) => string | null;
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
@@ -11,9 +11,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const ok = onLogin(username, password);
-    if (!ok) {
-      setError('That username or passcode is not accepted.');
+    const errorMessage = onLogin(username, password);
+    if (errorMessage) {
+      setError(errorMessage);
       return;
     }
     setError(null);

@@ -20,11 +20,11 @@ function App() {
   }, []);
 
   function handleLogin(username: string, password: string) {
-    const ok = login(username, password);
-    if (ok) {
+    const errorMessage = login(username, password);
+    if (!errorMessage) {
       setAuthState(getAuthState());
     }
-    return ok;
+    return errorMessage;
   }
 
   function handleLogout() {

@@ -29,20 +29,20 @@ export function login(username: string, password: string) {
   const cleanPassword = password.trim();
 
   if (!cleanUsername || !cleanPassword) {
-    return false;
+    return 'Enter a username and passcode to continue.';
   }
 
   if (!expectedUsername || !expectedPassword) {
-    return false;
+    return 'Local credentials are not configured. Restart the dev server or set VITE_APP_USERNAME and VITE_APP_PASSCODE.';
   }
 
   if (cleanUsername !== expectedUsername || cleanPassword !== expectedPassword) {
-    return false;
+    return 'That username or passcode is not accepted.';
   }
 
   const state: AuthState = { isAuthenticated: true, username: cleanUsername };
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
-  return true;
+  return null;
 }
 
 export function logout() {
