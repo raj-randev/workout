@@ -270,6 +270,23 @@ label {
   gap: 12px;
 }
 
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sync-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(242, 104, 60, 0.14);
+  color: #ffe9de;
+  border: 1px solid rgba(242, 104, 60, 0.24);
+  font-size: 0.95rem;
+}
+
 @media (min-width: 640px) {
   .exercise-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -284,6 +301,14 @@ label {
   .app-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: stretch;
+  }
+
+  .header-actions > * {
+    flex: 1 1 0;
   }
 
   .tab-bar {
