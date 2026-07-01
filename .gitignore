@@ -3,7 +3,6 @@ dist/
 .env
 .env.local
 .env.*.local
-amplify_outputs.json
 .amplify/
 .DS_Store
 npm-debug.log*
