@@ -31,7 +31,15 @@ input,
 select,
 textarea {
   font: inherit;
+  font-size: 1rem;
+  touch-action: manipulation;
 }
+
+button {
+  cursor: pointer;
+}
+
+/* ── Login ─────────────────────────────────────────────── */
 
 .login-shell {
   min-height: 100vh;
@@ -65,17 +73,20 @@ textarea {
   font-weight: 600;
 }
 
-button {
-  cursor: pointer;
-}
+/* ── Shell & layout ─────────────────────────────────────── */
 
 .app-shell {
   max-width: 1024px;
   margin: 0 auto;
-  padding: 18px 14px 32px;
+  /* Safe area: top notch + bottom home bar */
+  padding: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
 }
 
 .app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
@@ -91,9 +102,21 @@ button {
 h1 {
   margin: 0;
   font-family: 'Oswald', sans-serif;
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.6rem, 5vw, 3rem);
   line-height: 1.05;
 }
+
+.sync-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(242, 104, 60, 0.14);
+  color: #ffe9de;
+  border: 1px solid rgba(242, 104, 60, 0.24);
+  font-size: 0.95rem;
+}
+
+/* ── Tabs ───────────────────────────────────────────────── */
 
 .tab-bar {
   display: grid;
@@ -113,13 +136,15 @@ h1 {
   text-decoration: none;
   border-radius: 12px;
   transition: background 0.2s ease;
-  min-height: 44px;
+  min-height: 48px;
 }
 
 .tab.active,
 .tab:hover {
   background: rgba(242, 104, 60, 0.18);
 }
+
+/* ── Content ────────────────────────────────────────────── */
 
 .content {
   display: grid;
@@ -139,6 +164,8 @@ h1 {
   font-family: 'Oswald', sans-serif;
 }
 
+/* ── Controls ───────────────────────────────────────────── */
+
 .controls-row {
   display: flex;
   flex-wrap: wrap;
@@ -146,18 +173,46 @@ h1 {
   margin-bottom: 16px;
 }
 
-pill-button,
+/* ── Buttons ────────────────────────────────────────────── */
+
 .button-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-radius: 999px;
   border: 1px solid rgba(31, 37, 48, 0.14);
   background: white;
   color: #1f2530;
-  min-height: 44px;
+  min-height: 48px;
+  white-space: nowrap;
 }
+
+.button-primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 14px 18px;
+  border-radius: 14px;
+  font-weight: 700;
+  min-height: 48px;
+}
+
+.day-pill {
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 10px 16px;
+  border-radius: 999px;
+  min-height: 48px;
+  white-space: nowrap;
+}
+
+.day-pill.active {
+  background: rgba(242, 104, 60, 0.18);
+}
+
+/* ── Badges ─────────────────────────────────────────────── */
 
 .badge {
   display: inline-flex;
@@ -184,17 +239,7 @@ pill-button,
   color: var(--upper);
 }
 
-.day-pill {
-  border: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  padding: 10px 16px;
-  border-radius: 999px;
-}
-
-.day-pill.active {
-  background: rgba(242, 104, 60, 0.18);
-}
+/* ── Form elements ──────────────────────────────────────── */
 
 input,
 select {
@@ -204,6 +249,8 @@ select {
   background: white;
   color: #1f2530;
   border-radius: 14px;
+  /* 16px minimum prevents iOS Safari from zooming on focus */
+  font-size: 1rem;
 }
 
 label {
@@ -211,6 +258,8 @@ label {
   font-size: 0.9rem;
   margin-bottom: 8px;
 }
+
+/* ── Exercise grid & cards ──────────────────────────────── */
 
 .exercise-grid {
   display: grid;
@@ -227,10 +276,10 @@ label {
 
 .exercise-card header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px;
+  padding: 16px;
 }
 
 .exercise-card h3 {
@@ -239,121 +288,26 @@ label {
 }
 
 .exercise-card .card-body {
-  padding: 0 18px 18px;
+  padding: 0 16px 16px;
 }
+
+/* ── Set rows ───────────────────────────────────────────── */
 
 .set-row {
   display: grid;
+  /* 3 columns always: Weight | Reps | Effort */
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
 .set-row input {
   width: 100%;
+  /* Tighter padding on set inputs so 3 fit comfortably on narrow screens */
+  padding: 10px 10px;
 }
 
-.button-primary {
-  background: var(--accent);
-  color: white;
-  border: none;
-  padding: 14px 18px;
-  border-radius: 14px;
-  font-weight: 700;
-  min-height: 46px;
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.sync-banner {
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(242, 104, 60, 0.14);
-  color: #ffe9de;
-  border: 1px solid rgba(242, 104, 60, 0.24);
-  font-size: 0.95rem;
-}
-
-@media (min-width: 640px) {
-  .exercise-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .app-shell {
-    padding: 14px 12px 28px;
-  }
-
-  .app-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .header-actions {
-    justify-content: stretch;
-  }
-
-  .header-actions > * {
-    flex: 1 1 0;
-  }
-
-  .tab-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .tab:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .controls-row {
-    flex-direction: column;
-  }
-
-  .controls-row > * {
-    width: 100%;
-  }
-
-  .section-card {
-    padding: 14px;
-  }
-
-  .exercise-card header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .set-row {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-panel {
-    padding: 18px;
-  }
-
-  .chart-meta {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .history-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
+/* ── Modal ──────────────────────────────────────────────── */
 
 .modal-overlay {
   position: fixed;
@@ -372,6 +326,8 @@ label {
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 32px 120px rgba(0, 0, 0, 0.3);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .field-grid {
@@ -384,6 +340,8 @@ label {
   font-size: 0.92rem;
   margin-top: 10px;
 }
+
+/* ── Progress chart ─────────────────────────────────────── */
 
 .chart-panel {
   margin-top: 20px;
@@ -418,4 +376,49 @@ label {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   color: #1f2530;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+
+@media (min-width: 640px) {
+  .exercise-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .set-row input {
+    padding: 12px 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    align-items: flex-start;
+  }
+
+  .section-card {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .exercise-card header {
+    flex-direction: column;
+  }
+
+  .exercise-card .card-body {
+    padding: 0 12px 14px;
+  }
+
+  .modal-panel {
+    padding: 18px;
+  }
+
+  .chart-meta {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .history-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

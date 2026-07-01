@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EXERCISES } from '../data/exercises';
-import { loadAppData, loadAppDataAsync } from '../storage';
+import { loadAppDataAsync } from '../storage';
 import type { Session } from '../types';
 
 const rangeOptions = ['1W', '1M', '3M', '6M', '1Y', 'All'] as const;
