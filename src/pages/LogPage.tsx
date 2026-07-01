@@ -89,7 +89,7 @@ export function LogPage() {
   const [importMessage, setImportMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadAppDataAsync().then((loaded) => setAppData(loaded));
+    void loadAppDataAsync().then(({ data }) => setAppData(data));
   }, []);
 
   useEffect(() => {

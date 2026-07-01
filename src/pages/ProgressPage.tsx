@@ -35,9 +35,9 @@ export function ProgressPage() {
   const [appData, setAppData] = useState<{ sessions: Session[]; custom: any[] }>({ sessions: [], custom: [] });
 
   useEffect(() => {
-    void loadAppDataAsync().then((loaded) => setAppData(loaded));
+    void loadAppDataAsync().then(({ data }) => setAppData(data));
     const onStorageUpdate = () => {
-      void loadAppDataAsync().then((loaded) => setAppData(loaded));
+      void loadAppDataAsync().then(({ data }) => setAppData(data));
     };
     window.addEventListener('app-data-updated', onStorageUpdate);
     window.addEventListener('storage', onStorageUpdate);

@@ -6,6 +6,7 @@ import { FormPage } from './pages/FormPage';
 import { LogPage } from './pages/LogPage';
 import { ProgressPage } from './pages/ProgressPage';
 import { loadAppData, loadAppDataAsync, saveAppData } from './storage';
+import { saveAppDataToCloud } from './cloudData';
 import type { AppData } from './types';
 
 const tabs = [
@@ -22,7 +23,10 @@ function App() {
 
   useEffect(() => {
     setAuthState(getAuthState());
-    void loadAppDataAsync().then((loaded) => setAppData(loaded));
+    void loadAppDataAsync().then(({ data, source }) => {
+      setAppData(data);
+      setSyncMessage(source === 'cloud' ? '✓ Cloud data synced' : 'Data stored locally. Use Export/Import to move data between devices.');
+    });
   }, []);
 
   useEffect(() => {
@@ -42,6 +46,17 @@ function App() {
   function handleLogout() {
     logout();
     setAuthState(getAuthState());
+  }
+
+  function handleTestCloudSync() {
+    console.log('[UI] Testing cloud sync...');
+    void saveAppDataToCloud(appData).then(() => {
+      setSyncMessage('✓ Cloud sync test successful!');
+      console.log('[UI] Cloud sync test succeeded');
+    }).catch((error) => {
+      setSyncMessage(`✗ Cloud sync failed: ${error}`);
+      console.error('[UI] Cloud sync test failed:', error);
+    });
   }
 
   function handleExportData() {
@@ -94,6 +109,9 @@ function App() {
           <h1>Strength training workbook</h1>
         </div>
         <div className="header-actions">
+          <button type="button" className="button-pill" onClick={handleTestCloudSync}>
+            Test Cloud Sync
+          </button>
           <button type="button" className="button-pill" onClick={handleExportData}>
             Export data
           </button>

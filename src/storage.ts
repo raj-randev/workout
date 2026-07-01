@@ -51,14 +51,14 @@ export function loadAppData(): AppData {
   return loadLocalAppData();
 }
 
-export async function loadAppDataAsync(): Promise<AppData> {
+export async function loadAppDataAsync(): Promise<{ data: AppData; source: 'cloud' | 'local' }> {
   const cloudData = await loadAppDataFromCloud();
   if (cloudData) {
     persistLocalAppData(cloudData);
-    return cloudData;
+    return { data: cloudData, source: 'cloud' };
   }
 
-  return loadLocalAppData();
+  return { data: loadLocalAppData(), source: 'local' };
 }
 
 export function saveAppData(data: AppData) {
