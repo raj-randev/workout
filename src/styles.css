@@ -173,6 +173,11 @@ h1 {
   margin-bottom: 16px;
 }
 
+.date-label {
+  display: block;
+  margin-bottom: 16px;
+}
+
 /* ── Buttons ────────────────────────────────────────────── */
 
 .button-pill {

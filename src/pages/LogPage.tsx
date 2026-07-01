@@ -270,11 +270,11 @@ export function LogPage() {
             {day}
           </button>
         ))}
-        <label style={{ flex: 1, minWidth: '220px' }}>
-          Session date
-          <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
-        </label>
       </div>
+      <label className="date-label">
+        Session date
+        <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+      </label>
 
       <div className="controls-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
