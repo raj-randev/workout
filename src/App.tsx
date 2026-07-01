@@ -5,7 +5,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { FormPage } from './pages/FormPage';
 import { LogPage } from './pages/LogPage';
 import { ProgressPage } from './pages/ProgressPage';
-import { loadAppData, saveAppData } from './storage';
+import { loadAppData, loadAppDataAsync, saveAppData } from './storage';
 import type { AppData } from './types';
 
 const tabs = [
@@ -22,7 +22,7 @@ function App() {
 
   useEffect(() => {
     setAuthState(getAuthState());
-    setAppData(loadAppData());
+    void loadAppDataAsync().then((loaded) => setAppData(loaded));
   }, []);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ function App() {
   }
 
   function handleExportData() {
-    const payload = JSON.stringify(appData, null, 2);
+    const payload = JSON.stringify(loadAppData(), null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');

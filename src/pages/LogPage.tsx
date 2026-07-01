@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { DAYS } from '../data/days';
 import { importWorkbook } from '../import';
-import { addCustomExercise, createSessionDraft, deleteSession, findSession, loadAppData, removeCustomExercise, saveAppData } from '../storage';
+import { addCustomExercise, createSessionDraft, deleteSession, findSession, loadAppData, loadAppDataAsync, removeCustomExercise, saveAppData } from '../storage';
 import type { AppData, DayName, Session, SetEntry } from '../types';
 
 const dayNames: DayName[] = ['Lower A', 'Upper A', 'Lower B', 'Upper B'];
@@ -89,8 +89,7 @@ export function LogPage() {
   const [importMessage, setImportMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const loaded = loadAppData();
-    setAppData(loaded);
+    void loadAppDataAsync().then((loaded) => setAppData(loaded));
   }, []);
 
   useEffect(() => {

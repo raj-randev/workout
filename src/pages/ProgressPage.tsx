@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EXERCISES } from '../data/exercises';
-import { loadAppData } from '../storage';
+import { loadAppData, loadAppDataAsync } from '../storage';
 import type { Session } from '../types';
 
 const rangeOptions = ['1W', '1M', '3M', '6M', '1Y', 'All'] as const;
@@ -35,8 +35,10 @@ export function ProgressPage() {
   const [appData, setAppData] = useState<{ sessions: Session[]; custom: any[] }>({ sessions: [], custom: [] });
 
   useEffect(() => {
-    setAppData(loadAppData());
-    const onStorageUpdate = () => setAppData(loadAppData());
+    void loadAppDataAsync().then((loaded) => setAppData(loaded));
+    const onStorageUpdate = () => {
+      void loadAppDataAsync().then((loaded) => setAppData(loaded));
+    };
     window.addEventListener('app-data-updated', onStorageUpdate);
     window.addEventListener('storage', onStorageUpdate);
     return () => {

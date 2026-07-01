@@ -1,5 +1,6 @@
 import type { AppData, CustomExercise, DayName, ExerciseEntry, SetEntry, Session } from './types';
 import { DAYS } from './data/days';
+import { loadAppDataFromCloud, saveAppDataToCloud } from './cloudData';
 
 const STORAGE_KEY = 'lift-log-app-data';
 const APP_DATA_UPDATED_EVENT = 'app-data-updated';
@@ -24,7 +25,7 @@ function createBlankSets(count: number): SetEntry[] {
   return Array.from({ length: count }, () => ({ w: 0, r: 0, e: null }));
 }
 
-export function loadAppData(): AppData {
+function loadLocalAppData(): AppData {
   if (typeof window === 'undefined') {
     return emptyData;
   }
@@ -41,9 +42,29 @@ export function loadAppData(): AppData {
   }
 }
 
-export function saveAppData(data: AppData) {
+function persistLocalAppData(data: AppData) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+export function loadAppData(): AppData {
+  return loadLocalAppData();
+}
+
+export async function loadAppDataAsync(): Promise<AppData> {
+  const cloudData = await loadAppDataFromCloud();
+  if (cloudData) {
+    persistLocalAppData(cloudData);
+    return cloudData;
+  }
+
+  return loadLocalAppData();
+}
+
+export function saveAppData(data: AppData) {
+  if (typeof window === 'undefined') return;
+  persistLocalAppData(data);
+  void saveAppDataToCloud(data);
   window.dispatchEvent(new Event(APP_DATA_UPDATED_EVENT));
 }
 
