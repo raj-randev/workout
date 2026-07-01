@@ -157,6 +157,9 @@ h1 {
   border-radius: 18px;
   padding: 16px;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.16);
+  /* Prevent iOS date/select intrinsic width from expanding the grid cell */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .section-card h2 {
@@ -249,6 +252,7 @@ h1 {
 input,
 select {
   width: 100%;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid rgba(31, 37, 48, 0.18);
   background: white;
