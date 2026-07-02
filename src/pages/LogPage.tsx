@@ -259,7 +259,7 @@ export function LogPage() {
         </div>
       </header>
 
-      <div className="controls-row">
+      <div className="day-pills">
         {dayNames.map((day) => (
           <button
             key={day}
@@ -271,10 +271,10 @@ export function LogPage() {
           </button>
         ))}
       </div>
-      <label className="date-label">
-        Session date
-        <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
-      </label>
+      <div className="date-field">
+        <label htmlFor="session-date">Session date</label>
+        <input id="session-date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+      </div>
 
       <div className="controls-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
