@@ -18,7 +18,7 @@ export function FormPage() {
               <header>
                 <div>
                   <h3>{name}</h3>
-                  <p style={{ margin: '6px 0 0', color: '#6a7180' }}>{item.muscle}</p>
+                  <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: '0.9rem' }}>{item.muscle}</p>
                 </div>
                 <a href={getExerciseDemoLink(name) ?? '#'} target="_blank" rel="noreferrer" className="badge custom">
                   Watch demo

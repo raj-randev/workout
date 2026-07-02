@@ -301,7 +301,7 @@ export function LogPage() {
                 {exercise.name}
                 <button
                   type="button"
-                  style={{ border: 'none', background: 'transparent', color: '#1f2530', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ border: 'none', background: 'transparent', color: 'var(--upper)', fontWeight: 700, cursor: 'pointer' }}
                   onClick={() => deleteCustomExercise(exercise.name, selectedDay)}
                 >
                   ×
@@ -313,7 +313,7 @@ export function LogPage() {
       )}
 
       {editingSavedSession && (
-        <div style={{ marginBottom: '18px', color: '#4c63b6' }}>
+        <div style={{ marginBottom: '14px', color: 'var(--upper)', fontSize: '0.9rem' }}>
           Editing saved session for {selectedDay} on {selectedDate}.
         </div>
       )}
@@ -331,7 +331,7 @@ export function LogPage() {
                   </span>
                 </div>
               </div>
-              <div style={{ textAlign: 'right', fontSize: '0.92rem', color: '#6a7180' }}>
+              <div style={{ textAlign: 'right', fontSize: '0.85rem', color: 'var(--muted)' }}>
                 Last: {getLastSessionForExercise(entry.exercise, selectedDay, selectedDate, appData) ?? 'none'}
               </div>
             </header>
@@ -389,7 +389,7 @@ export function LogPage() {
       <div style={{ marginTop: '24px' }}>
         <label>
           Session export preview
-          <textarea readOnly value={copyText} rows={8} style={{ width: '100%', marginTop: '8px', borderRadius: '14px', border: '1px solid rgba(31,37,48,0.18)', padding: '14px', resize: 'vertical' }} />
+          <textarea readOnly value={copyText} rows={8} style={{ width: '100%', marginTop: '8px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', padding: '12px', resize: 'vertical', background: 'rgba(255,255,255,0.04)', color: 'var(--muted)', fontSize: '0.85rem' }} />
         </label>
       </div>
 

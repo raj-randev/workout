@@ -111,7 +111,7 @@ export function ProgressPage() {
       </div>
 
       {filteredSessions.length === 0 ? (
-        <div style={{ color: '#6a7180', marginTop: '16px' }}>
+        <div style={{ color: 'var(--muted)', marginTop: '16px', fontSize: '0.9rem' }}>
           No session data found for {exercise} in this range. Save a session in the Log tab to see the chart.
         </div>
       ) : (
@@ -130,7 +130,7 @@ export function ProgressPage() {
             {chartPoints.map((point) => (
               <g key={point.date}>
                 <circle cx={point.x} cy={point.y} r="2.5" fill="var(--upper)" />
-                <text x={point.x} y={point.y - 4} textAnchor="middle" fontSize="3.5" fill="#f7f6f2">
+                <text x={point.x} y={point.y - 4} textAnchor="middle" fontSize="3.5" fill="var(--ink)">
                   {point.value}
                 </text>
               </g>
