@@ -66,7 +66,8 @@ export function LogPage() {
 
   function handleDateChange(date: string) {
     setSelectedDate(date);
-    setSelectedDay(null);
+    const existing = appData.sessions.find((s) => s.date === date);
+    setSelectedDay(existing?.day ?? null);
   }
 
   function handleDaySelect(day: DayName) {
