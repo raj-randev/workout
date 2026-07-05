@@ -68,19 +68,14 @@ export function ProgressPage() {
       date: session.date,
       value: getTopWeight(session, exercise),
     }));
-    const rawMax = Math.max(...values.map((item) => item.value), 1);
-    const rawMin = Math.min(...values.map((item) => item.value));
-    const range = rawMax - rawMin || rawMax;
-    const pad = range * 0.25;
-    const yLow = Math.max(0, rawMin - pad);
-    const yHigh = rawMax + pad * 0.5;
-    const span = yHigh - yLow || 1;
+    const rawMax = Math.max(...values.map((v) => v.value), 1);
+    const rawMin = Math.min(...values.map((v) => v.value));
+    const span = rawMax - rawMin;
     return values.map((item, index) => ({
       ...item,
-      x: values.length > 1 ? (index / (values.length - 1)) * 96 + 2 : 50,
-      y: 90 - ((item.value - yLow) / span) * 80,
-      yLow,
-      yHigh,
+      x: values.length > 1 ? (index / (values.length - 1)) * 92 + 4 : 50,
+      // span=0 means all values equal — centre the line
+      y: span === 0 ? 46 : 80 - ((item.value - rawMin) / span) * 68,
     }));
   }, [filteredSessions, exercise]);
 
@@ -134,11 +129,11 @@ export function ProgressPage() {
             {[10, 50, 90].map((y) => (
               <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
             ))}
-            {/* y-axis labels (min / max) */}
-            <text x="1" y="13" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {/* y-axis labels aligned to actual line extents */}
+            <text x="4" y="10" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {maxWeight}kg
             </text>
-            <text x="1" y="93" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <text x="4" y="96" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {minWeight}kg
             </text>
             {/* gradient fill under the line */}
