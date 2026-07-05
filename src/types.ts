@@ -9,6 +9,7 @@ export type SetEntry = {
 export type ExerciseEntry = {
   exercise: string;
   sets: SetEntry[];
+  notes?: string;
 };
 
 export type Session = {

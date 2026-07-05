@@ -31,7 +31,8 @@ function formatSessionForClaude(session: Session) {
       })
       .filter(Boolean)
       .join(', ');
-    lines.push(`${entry.exercise}: ${row || 'no data'}`);
+    const noteLine = entry.notes?.trim() ? ` [${entry.notes.trim()}]` : '';
+    lines.push(`${entry.exercise}: ${row || 'no data'}${noteLine}`);
   });
   return lines.join('\n');
 }
@@ -45,6 +46,7 @@ export function LogPage() {
   const [customForm, setCustomForm] = useState({ name: '', day: 'Lower A' as DayName, sets: 3, reps: '10–12' });
   const [customError, setCustomError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
@@ -76,6 +78,28 @@ export function LogPage() {
     } else if (selectedDay === null) {
       setSelectedDay(day);
     }
+  }
+
+  function toggleNotes(exercise: string) {
+    setOpenNotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(exercise)) next.delete(exercise);
+      else next.add(exercise);
+      return next;
+    });
+  }
+
+  function updateNotes(exercise: string, value: string) {
+    if (isLocked) return;
+    setDraftSession((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        entries: prev.entries.map((entry) =>
+          entry.exercise === exercise ? { ...entry, notes: value } : entry,
+        ),
+      };
+    });
   }
 
   function updateEntry(exercise: string, setIndex: number, key: keyof SetEntry, value: string) {
@@ -284,6 +308,52 @@ export function LogPage() {
                         </label>
                       </div>
                     ))}
+                    {/* Notes toggle */}
+                    <button
+                      type="button"
+                      onClick={() => toggleNotes(entry.exercise)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: entry.notes?.trim() ? 'var(--accent)' : 'var(--muted)',
+                        fontSize: '0.82rem',
+                        fontWeight: 500,
+                        padding: '6px 0 2px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.7rem' }}>{openNotes.has(entry.exercise) ? '▼' : '▶'}</span>
+                      Notes{entry.notes?.trim() ? ' ·' : ''}
+                      {entry.notes?.trim() && (
+                        <span style={{ color: 'var(--muted)', fontWeight: 400, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {entry.notes.trim()}
+                        </span>
+                      )}
+                    </button>
+                    {openNotes.has(entry.exercise) && (
+                      <textarea
+                        rows={3}
+                        value={entry.notes ?? ''}
+                        readOnly={isLocked}
+                        placeholder="Add notes for this exercise…"
+                        onChange={(e) => updateNotes(entry.exercise, e.target.value)}
+                        style={{
+                          width: '100%',
+                          marginTop: '6px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          padding: '10px 12px',
+                          resize: 'vertical',
+                          background: 'rgba(255,255,255,0.04)',
+                          color: isLocked ? 'var(--muted)' : 'var(--ink)',
+                          fontSize: '0.9rem',
+                          opacity: isLocked ? 0.7 : 1,
+                        }}
+                      />
+                    )}
                   </div>
                 </article>
               ))}

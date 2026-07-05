@@ -68,15 +68,24 @@ export function ProgressPage() {
       date: session.date,
       value: getTopWeight(session, exercise),
     }));
-    const maxValue = Math.max(...values.map((item) => item.value), 1);
+    const rawMax = Math.max(...values.map((item) => item.value), 1);
+    const rawMin = Math.min(...values.map((item) => item.value));
+    const range = rawMax - rawMin || rawMax;
+    const pad = range * 0.25;
+    const yLow = Math.max(0, rawMin - pad);
+    const yHigh = rawMax + pad * 0.5;
+    const span = yHigh - yLow || 1;
     return values.map((item, index) => ({
       ...item,
-      x: values.length > 1 ? (index / (values.length - 1)) * 100 : 50,
-      y: 100 - (item.value / maxValue) * 100,
+      x: values.length > 1 ? (index / (values.length - 1)) * 96 + 2 : 50,
+      y: 90 - ((item.value - yLow) / span) * 80,
+      yLow,
+      yHigh,
     }));
   }, [filteredSessions, exercise]);
 
   const maxWeight = useMemo(() => Math.max(...filteredSessions.map((session) => getTopWeight(session, exercise)), 0), [filteredSessions, exercise]);
+  const minWeight = useMemo(() => filteredSessions.length ? Math.min(...filteredSessions.map((session) => getTopWeight(session, exercise))) : 0, [filteredSessions, exercise]);
 
   return (
     <section className="section-card">
@@ -118,23 +127,68 @@ export function ProgressPage() {
         <div className="chart-panel">
           <div className="chart-meta">
             <div>{filteredSessions.length} session{filteredSessions.length === 1 ? '' : 's'}</div>
-            <div>Top weight: {maxWeight}kg</div>
+            <div>Top weight: {maxWeight}kg · Low: {minWeight}kg</div>
           </div>
-          <svg viewBox="0 0 100 120" preserveAspectRatio="none" className="chart-svg">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="chart-svg">
+            {/* subtle gridlines at 10%, 50%, 90% y */}
+            {[10, 50, 90].map((y) => (
+              <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+            ))}
+            {/* y-axis labels (min / max) */}
+            <text x="1" y="13" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {maxWeight}kg
+            </text>
+            <text x="1" y="93" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {minWeight}kg
+            </text>
+            {/* gradient fill under the line */}
+            <defs>
+              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {chartPoints.length > 1 && (
+              <polygon
+                fill="url(#chartFill)"
+                points={[
+                  ...chartPoints.map((p) => `${p.x},${p.y}`),
+                  `${chartPoints[chartPoints.length - 1].x},100`,
+                  `${chartPoints[0].x},100`,
+                ].join(' ')}
+              />
+            )}
             <polyline
               fill="none"
               stroke="var(--accent)"
               strokeWidth="1.5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
               points={chartPoints.map((point) => `${point.x},${point.y}`).join(' ')}
             />
-            {chartPoints.map((point) => (
-              <g key={point.date}>
-                <circle cx={point.x} cy={point.y} r="2.5" fill="var(--upper)" />
-                <text x={point.x} y={point.y - 4} textAnchor="middle" fontSize="3.5" fill="var(--ink)">
-                  {point.value}
-                </text>
-              </g>
-            ))}
+            {chartPoints.map((point, i) => {
+              const isFirst = i === 0;
+              const isLast = i === chartPoints.length - 1;
+              const isPeak = point.value === maxWeight;
+              const showLabel = isFirst || isLast || isPeak;
+              return (
+                <g key={point.date}>
+                  <circle cx={point.x} cy={point.y} r={isPeak ? 3 : 2} fill={isPeak ? 'var(--ok)' : 'var(--upper)'} />
+                  {showLabel && (
+                    <text
+                      x={point.x}
+                      y={point.y - 4}
+                      textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
+                      fontSize="4"
+                      fill="var(--ink)"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {point.value}kg
+                    </text>
+                  )}
+                </g>
+              );
+            })}
           </svg>
           <div className="history-list">
             {filteredSessions.map((session) => (
