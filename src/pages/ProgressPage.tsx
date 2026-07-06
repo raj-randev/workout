@@ -82,6 +82,17 @@ export function ProgressPage() {
   const maxWeight = useMemo(() => Math.max(...filteredSessions.map((session) => getTopWeight(session, exercise)), 0), [filteredSessions, exercise]);
   const minWeight = useMemo(() => filteredSessions.length ? Math.min(...filteredSessions.map((session) => getTopWeight(session, exercise))) : 0, [filteredSessions, exercise]);
 
+  const isNewPB = useMemo(() => {
+    if (filteredSessions.length < 2) return false;
+    const lastSession = filteredSessions[filteredSessions.length - 1];
+    const lastWeight = getTopWeight(lastSession, exercise);
+    return lastWeight === maxWeight && filteredSessions.slice(0, -1).every((s) => getTopWeight(s, exercise) < lastWeight);
+  }, [filteredSessions, exercise, maxWeight]);
+
+  const dateRange = filteredSessions.length > 1
+    ? `${filteredSessions[0].date} – ${filteredSessions[filteredSessions.length - 1].date}`
+    : null;
+
   return (
     <section className="section-card">
       <header>
@@ -121,8 +132,27 @@ export function ProgressPage() {
       ) : (
         <div className="chart-panel">
           <div className="chart-meta">
-            <div>{filteredSessions.length} session{filteredSessions.length === 1 ? '' : 's'}</div>
-            <div>Top weight: {maxWeight}kg · Low: {minWeight}kg</div>
+            <div>
+              {filteredSessions.length} session{filteredSessions.length === 1 ? '' : 's'}
+              {dateRange && <span style={{ color: 'var(--muted)', marginLeft: '6px', fontSize: '0.82rem' }}>({dateRange})</span>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {isNewPB && (
+                <span style={{
+                  background: 'rgba(34, 197, 94, 0.15)',
+                  color: 'var(--ok)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '999px',
+                  padding: '2px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                }}>
+                  NEW PB
+                </span>
+              )}
+              <span>Top: {maxWeight}kg · Low: {minWeight}kg</span>
+            </div>
           </div>
           <svg viewBox="0 0 200 100" preserveAspectRatio="none" className="chart-svg">
             {/* subtle gridlines at 10%, 50%, 90% y */}

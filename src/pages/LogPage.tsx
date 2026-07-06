@@ -1,23 +1,57 @@
 import { useEffect, useState } from 'react';
+import { DAYS } from '../data/days';
 import { addCustomExercise, createSessionDraft, deleteSession, findSession, loadAppDataAsync, removeCustomExercise, saveAppData } from '../storage';
 import type { AppData, DayName, Session, SetEntry } from '../types';
 
 const dayNames: DayName[] = ['Lower A', 'Upper A', 'Lower B', 'Upper B'];
+
+function formatDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function formatShortDate(iso: string) {
+  const [, m, d] = iso.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[Number(m) - 1]} ${Number(d)}`;
+}
 
 function compareSessionDate(a: Session, b: Session) {
   return a.date.localeCompare(b.date);
 }
 
 function getLastSessionForExercise(exercise: string, day: DayName, date: string, data: AppData) {
-  const sessions = data.sessions
-    .filter((session) => session.day === day && session.date < date)
-    .sort((a, b) => compareSessionDate(b, a));
-  const last = sessions[0];
+  const last = data.sessions
+    .filter((s) => s.day === day && s.date < date)
+    .sort((a, b) => compareSessionDate(b, a))[0];
   if (!last) return null;
   const entry = last.entries.find((item) => item.exercise === exercise);
   if (!entry) return null;
   const set = entry.sets[0];
   return `${set.w}kg × ${set.r}${set.e !== null ? ` @ ${set.e}` : ''}`;
+}
+
+function getPriorSet(exercise: string, setIndex: number, day: DayName, date: string, data: AppData): SetEntry | null {
+  const prior = data.sessions
+    .filter((s) => s.day === day && s.date < date)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (!prior) return null;
+  const entry = prior.entries.find((e) => e.exercise === exercise);
+  const set = entry?.sets[setIndex];
+  if (!set || (!set.w && !set.r)) return null;
+  return set;
+}
+
+function getRepRange(exercise: string, day: DayName, data: AppData): string | null {
+  const found = DAYS[day].find(([name]) => name === exercise);
+  if (found) return found[2];
+  return data.custom.find((c) => c.name === exercise && c.day === day)?.reps ?? null;
+}
+
+function calcVolume(session: Session): number {
+  return session.entries.reduce(
+    (total, entry) => total + entry.sets.reduce((sum, set) => sum + set.w * set.r, 0),
+    0,
+  );
 }
 
 function formatSessionForClaude(session: Session) {
@@ -48,9 +82,18 @@ export function LogPage() {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
   const [setPopup, setSetPopup] = useState<{ exercise: string; setIndex: number } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
+    const onUpdate = () => void loadAppDataAsync().then(({ data }) => setAppData(data));
+    window.addEventListener('app-data-updated', onUpdate);
+    window.addEventListener('storage', onUpdate);
+    return () => {
+      window.removeEventListener('app-data-updated', onUpdate);
+      window.removeEventListener('storage', onUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -67,11 +110,30 @@ export function LogPage() {
     : null;
   const isLocked = currentSession !== null;
 
+  const recentSessions = [...appData.sessions]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 7);
+
+  const isUpperDay = selectedDay?.startsWith('Upper') ?? false;
+  const dayColor = isUpperDay ? 'var(--upper)' : 'var(--lower)';
+
+  function showToast(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2800);
+  }
+
   function handleDateChange(date: string) {
     setSelectedDate(date);
     const existing = appData.sessions.find((s) => s.date === date);
     setSelectedDay(existing?.day ?? null);
     setSetPopup(null);
+  }
+
+  function stepDate(delta: number) {
+    if (!selectedDate) return;
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    handleDateChange(formatDate(d));
   }
 
   function handleDaySelect(day: DayName) {
@@ -121,6 +183,15 @@ export function LogPage() {
     });
   }
 
+  function copySetFromPrevious(exercise: string, setIndex: number) {
+    if (!draftSession || setIndex === 0) return;
+    const prevSet = draftSession.entries.find((e) => e.exercise === exercise)?.sets[setIndex - 1];
+    if (!prevSet) return;
+    updateEntry(exercise, setIndex, 'w', String(prevSet.w));
+    updateEntry(exercise, setIndex, 'r', String(prevSet.r));
+    if (prevSet.e !== null) updateEntry(exercise, setIndex, 'e', String(prevSet.e));
+  }
+
   function persistSession() {
     if (!draftSession || !selectedDay) return;
     const filtered = appData.sessions.filter(
@@ -132,14 +203,22 @@ export function LogPage() {
     };
     setAppData(nextData);
     saveAppData(nextData);
+    const vol = calcVolume(draftSession);
+    showToast(vol > 0 ? `Session saved · ${vol.toLocaleString()} kg total` : 'Session saved');
   }
 
   function removeSession() {
+    setShowDeleteConfirm(true);
+  }
+
+  function confirmDelete() {
     if (!selectedDay) return;
+    setShowDeleteConfirm(false);
     const nextData = deleteSession(selectedDate, selectedDay, appData);
     setAppData(nextData);
     saveAppData(nextData);
     setDraftSession(createSessionDraft(selectedDate, selectedDay, nextData.custom));
+    showToast('Session deleted');
   }
 
   function submitCustomExercise() {
@@ -157,12 +236,14 @@ export function LogPage() {
     setAppData(nextData);
     saveAppData(nextData);
     setIsCustomModalOpen(false);
+    showToast(`"${trimmed}" added to ${customForm.day}`);
   }
 
   function handleDeleteCustomExercise(name: string, day: DayName) {
     const nextData = removeCustomExercise(name, day, appData);
     setAppData(nextData);
     saveAppData(nextData);
+    showToast(`"${name}" removed`);
   }
 
   function copyForClaude() {
@@ -191,24 +272,74 @@ export function LogPage() {
         <p className="eyebrow">Workout log</p>
         <h2 style={{ marginTop: 0, marginBottom: '18px' }}>Log session</h2>
 
-        {/* Date — blank on load, always shown */}
+        {/* Date field with Log today + nav arrows */}
         <div className="date-field">
-          <label htmlFor="session-date">Session date</label>
-          <input
-            id="session-date"
-            type="date"
-            value={selectedDate}
-            onChange={(e) => handleDateChange(e.target.value)}
-          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label htmlFor="session-date" style={{ margin: 0 }}>Session date</label>
+            {!selectedDate && (
+              <button
+                type="button"
+                className="button-pill"
+                style={{ fontSize: '0.82rem', minHeight: '34px', padding: '4px 14px' }}
+                onClick={() => handleDateChange(formatDate(new Date()))}
+              >
+                Log today
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+            {selectedDate && (
+              <button type="button" className="date-nav-btn" onClick={() => stepDate(-1)} aria-label="Previous day">
+                ‹
+              </button>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <input
+                id="session-date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+              />
+            </div>
+            {selectedDate && (
+              <button type="button" className="date-nav-btn" onClick={() => stepDate(1)} aria-label="Next day">
+                ›
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Empty state with recent sessions */}
         {!selectedDate && (
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '4px 0 0' }}>
-            Select a date to begin logging.
-          </p>
+          <div className="log-empty-state">
+            {recentSessions.length === 0 ? (
+              <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>
+                No sessions yet — tap "Log today" or pick a date to begin.
+              </p>
+            ) : (
+              <>
+                <p className="log-empty-hint">Recent sessions</p>
+                <div className="recent-sessions-row">
+                  {recentSessions.map((s) => (
+                    <button
+                      key={`${s.date}-${s.day}`}
+                      type="button"
+                      className="recent-session-pill"
+                      onClick={() => { setSelectedDate(s.date); setSelectedDay(s.day); }}
+                    >
+                      <span className="recent-session-date">{formatShortDate(s.date)}</span>
+                      <span className={`recent-session-day ${s.day.startsWith('Upper') ? 'upper' : 'lower'}`}>
+                        {s.day}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
-        {/* Day pills — appear once date is selected */}
+        {/* Day pills */}
         {selectedDate && (
           <div className="day-pills">
             {dayNames.map((day) => (
@@ -220,30 +351,27 @@ export function LogPage() {
                 onClick={() => handleDaySelect(day)}
               >
                 {day}
+                {day === selectedDay && !isLocked && (
+                  <span className="day-pill-clear" aria-hidden="true">×</span>
+                )}
               </button>
             ))}
           </div>
         )}
 
-        {/* Exercise grid — appears once day is selected */}
+        {/* Exercise grid */}
         {selectedDate && selectedDay && draftSession && (
           <>
             {isLocked && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                flexWrap: 'wrap',
-                padding: '10px 14px',
-                marginBottom: '14px',
-                background: 'rgba(255,255,255,0.04)',
-                borderRadius: '12px',
-                border: '1px solid var(--border)',
-              }}>
-                <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
-                  Session saved — read only
-                </span>
+              <div className="session-locked-banner">
+                <div>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Session saved — read only</span>
+                  {calcVolume(draftSession) > 0 && (
+                    <span style={{ color: 'var(--ok)', fontSize: '0.82rem', marginLeft: '10px' }}>
+                      {calcVolume(draftSession).toLocaleString()} kg total
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="button-pill"
@@ -256,95 +384,104 @@ export function LogPage() {
             )}
 
             <div className="exercise-grid">
-              {draftSession.entries.map((entry) => (
-                <article className="exercise-card" key={entry.exercise}>
-                  <header>
-                    <div>
-                      <h3>{entry.exercise}</h3>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                        <span className="badge">{entry.sets.length} sets</span>
-                        <span className={`badge ${selectedDay.startsWith('Upper') ? 'day-upper' : 'day-lower'}`}>
-                          {selectedDay.startsWith('Upper') ? 'Upper' : 'Lower'} day
-                        </span>
+              {draftSession.entries.map((entry) => {
+                const repRange = getRepRange(entry.exercise, selectedDay, appData);
+                return (
+                  <article
+                    className="exercise-card"
+                    key={entry.exercise}
+                    style={{ borderTopColor: dayColor }}
+                  >
+                    <header>
+                      <div>
+                        <h3>{entry.exercise}</h3>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                          <span className="badge">{entry.sets.length} sets</span>
+                          {repRange && (
+                            <span className={`badge ${isUpperDay ? 'day-upper' : 'day-lower'}`}>
+                              {repRange} reps
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ textAlign: 'right', fontSize: '0.85rem', color: 'var(--muted)' }}>
-                      Last: {getLastSessionForExercise(entry.exercise, selectedDay, selectedDate, appData) ?? 'none'}
-                    </div>
-                  </header>
-                  <div className="card-body">
-                    {entry.sets.map((set, i) => (
+                      <div style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--muted)', flexShrink: 0 }}>
+                        Last: {getLastSessionForExercise(entry.exercise, selectedDay, selectedDate, appData) ?? 'none'}
+                      </div>
+                    </header>
+                    <div className="card-body">
+                      {entry.sets.map((set, i) => (
+                        <button
+                          key={`${entry.exercise}-${i}`}
+                          type="button"
+                          className={`set-display-row${!isLocked ? ' set-display-row--tap' : ''}`}
+                          disabled={isLocked}
+                          onClick={() => setSetPopup({ exercise: entry.exercise, setIndex: i })}
+                        >
+                          <div className="set-display-cell">
+                            <span className="set-display-label">Weight</span>
+                            <span className="set-display-value">{set.w || 0}</span>
+                          </div>
+                          <div className="set-display-cell">
+                            <span className="set-display-label">Reps</span>
+                            <span className="set-display-value">{set.r || 0}</span>
+                          </div>
+                          <div className="set-display-cell">
+                            <span className="set-display-label">Effort</span>
+                            <span className="set-display-value">{set.e ?? '—'}</span>
+                          </div>
+                          <span className="set-display-index">S{i + 1}</span>
+                        </button>
+                      ))}
                       <button
-                        key={`${entry.exercise}-${i}`}
                         type="button"
-                        className={`set-display-row${!isLocked ? ' set-display-row--tap' : ''}`}
-                        disabled={isLocked}
-                        onClick={() => setSetPopup({ exercise: entry.exercise, setIndex: i })}
-                      >
-                        <div className="set-display-cell">
-                          <span className="set-display-label">Weight</span>
-                          <span className="set-display-value">{set.w || 0}</span>
-                        </div>
-                        <div className="set-display-cell">
-                          <span className="set-display-label">Reps</span>
-                          <span className="set-display-value">{set.r || 0}</span>
-                        </div>
-                        <div className="set-display-cell">
-                          <span className="set-display-label">Effort</span>
-                          <span className="set-display-value">{set.e ?? '—'}</span>
-                        </div>
-                        <span className="set-display-index">S{i + 1}</span>
-                      </button>
-                    ))}
-                    {/* Notes toggle */}
-                    <button
-                      type="button"
-                      onClick={() => toggleNotes(entry.exercise)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: 'transparent',
-                        border: 'none',
-                        color: entry.notes?.trim() ? 'var(--accent)' : 'var(--muted)',
-                        fontSize: '0.82rem',
-                        fontWeight: 500,
-                        padding: '6px 0 2px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <span style={{ fontSize: '0.7rem' }}>{openNotes.has(entry.exercise) ? '▼' : '▶'}</span>
-                      Notes{entry.notes?.trim() ? ' ·' : ''}
-                      {entry.notes?.trim() && (
-                        <span style={{ color: 'var(--muted)', fontWeight: 400, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {entry.notes.trim()}
-                        </span>
-                      )}
-                    </button>
-                    {openNotes.has(entry.exercise) && (
-                      <textarea
-                        rows={3}
-                        value={entry.notes ?? ''}
-                        readOnly={isLocked}
-                        placeholder="Add notes for this exercise…"
-                        onChange={(e) => updateNotes(entry.exercise, e.target.value)}
+                        onClick={() => toggleNotes(entry.exercise)}
                         style={{
-                          width: '100%',
-                          marginTop: '6px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          padding: '10px 12px',
-                          resize: 'vertical',
-                          background: 'rgba(255,255,255,0.04)',
-                          color: isLocked ? 'var(--muted)' : 'var(--ink)',
-                          fontSize: '0.9rem',
-                          opacity: isLocked ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: entry.notes?.trim() ? 'var(--accent)' : 'var(--muted)',
+                          fontSize: '0.82rem',
+                          fontWeight: 500,
+                          padding: '6px 0 2px',
+                          cursor: 'pointer',
                         }}
-                      />
-                    )}
-                  </div>
-                </article>
-              ))}
+                      >
+                        <span style={{ fontSize: '0.7rem' }}>{openNotes.has(entry.exercise) ? '▼' : '▶'}</span>
+                        Notes{entry.notes?.trim() ? ' ·' : ''}
+                        {entry.notes?.trim() && (
+                          <span style={{ color: 'var(--muted)', fontWeight: 400, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {entry.notes.trim()}
+                          </span>
+                        )}
+                      </button>
+                      {openNotes.has(entry.exercise) && (
+                        <textarea
+                          rows={3}
+                          value={entry.notes ?? ''}
+                          readOnly={isLocked}
+                          placeholder="Add notes for this exercise…"
+                          onChange={(e) => updateNotes(entry.exercise, e.target.value)}
+                          style={{
+                            width: '100%',
+                            marginTop: '6px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            padding: '10px 12px',
+                            resize: 'vertical',
+                            background: 'rgba(255,255,255,0.04)',
+                            color: isLocked ? 'var(--muted)' : 'var(--ink)',
+                            fontSize: '0.9rem',
+                            fontFamily: 'inherit',
+                            opacity: isLocked ? 0.7 : 1,
+                          }}
+                        />
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginTop: '18px' }}>
@@ -478,6 +615,31 @@ export function LogPage() {
         </div>
       )}
 
+      {/* ── Delete confirmation modal ─────────────────── */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-panel" style={{ maxWidth: '360px' }}>
+            <h3 style={{ marginBottom: '10px' }}>Delete session?</h3>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '0 0 22px' }}>
+              All data for {selectedDay} on {selectedDate} will be removed. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="button-pill" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button-primary"
+                style={{ flex: 1, background: 'var(--avoid)', borderRadius: '999px' }}
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Set entry popup ──────────────────────────── */}
       {(() => {
         if (!setPopup || !draftSession || isLocked) return null;
@@ -486,11 +648,13 @@ export function LogPage() {
         if (!popupEntry || !popupSet) return null;
         const totalSets = popupEntry.sets.length;
         const hasNext = setPopup.setIndex < totalSets - 1;
+        const priorSet = getPriorSet(setPopup.exercise, setPopup.setIndex, selectedDay!, selectedDate, appData);
+        const prevSet = setPopup.setIndex > 0 ? popupEntry.sets[setPopup.setIndex - 1] : null;
         return (
           <div className="bottom-sheet-overlay" onClick={() => setSetPopup(null)}>
             <div className="set-popup" onClick={(e) => e.stopPropagation()}>
               <div className="set-popup-handle" />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
                 <div>
                   <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     {setPopup.exercise}
@@ -507,7 +671,12 @@ export function LogPage() {
                   ×
                 </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              {priorSet && (
+                <p style={{ margin: '6px 0 14px', color: 'var(--muted)', fontSize: '0.82rem' }}>
+                  Last session: {priorSet.w}kg × {priorSet.r}{priorSet.e !== null ? ` @ ${priorSet.e}` : ''}
+                </p>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <label>
                   Weight (kg)
                   <input
@@ -548,13 +717,18 @@ export function LogPage() {
                   />
                 </label>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              {prevSet && (prevSet.w || prevSet.r) ? (
                 <button
                   type="button"
                   className="button-pill"
-                  style={{ flex: 1 }}
-                  onClick={() => setSetPopup(null)}
+                  style={{ width: '100%', marginBottom: '12px', fontSize: '0.85rem', minHeight: '40px' }}
+                  onClick={() => copySetFromPrevious(setPopup.exercise, setPopup.setIndex)}
                 >
+                  Copy from Set {setPopup.setIndex} · {prevSet.w}kg × {prevSet.r}
+                </button>
+              ) : null}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" className="button-pill" style={{ flex: 1 }} onClick={() => setSetPopup(null)}>
                   Done
                 </button>
                 {hasNext && (
@@ -572,6 +746,9 @@ export function LogPage() {
           </div>
         );
       })()}
+
+      {/* ── Toast ─────────────────────────────────────── */}
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }

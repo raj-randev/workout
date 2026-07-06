@@ -54,7 +54,7 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Lift Log</p>
+          <p className="eyebrow app-eyebrow">Lift Log</p>
           <h1>Strength training workbook</h1>
         </div>
         <button type="button" className="button-pill" onClick={handleLogout}>
