@@ -73,7 +73,7 @@ export function ProgressPage() {
     const span = rawMax - rawMin;
     return values.map((item, index) => ({
       ...item,
-      x: values.length > 1 ? (index / (values.length - 1)) * 92 + 4 : 50,
+      x: values.length > 1 ? (index / (values.length - 1)) * 188 + 6 : 100,
       // span=0 means all values equal — centre the line
       y: span === 0 ? 46 : 80 - ((item.value - rawMin) / span) * 68,
     }));
@@ -124,16 +124,16 @@ export function ProgressPage() {
             <div>{filteredSessions.length} session{filteredSessions.length === 1 ? '' : 's'}</div>
             <div>Top weight: {maxWeight}kg · Low: {minWeight}kg</div>
           </div>
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="chart-svg">
+          <svg viewBox="0 0 200 100" preserveAspectRatio="none" className="chart-svg">
             {/* subtle gridlines at 10%, 50%, 90% y */}
             {[10, 50, 90].map((y) => (
-              <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+              <line key={y} x1="0" y1={y} x2="200" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
             ))}
-            {/* y-axis labels aligned to actual line extents */}
-            <text x="4" y="10" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {/* y-axis labels */}
+            <text x="6" y="10" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {maxWeight}kg
             </text>
-            <text x="4" y="96" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <text x="6" y="96" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {minWeight}kg
             </text>
             {/* gradient fill under the line */}
