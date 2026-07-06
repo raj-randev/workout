@@ -114,6 +114,12 @@ export function LogPage() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 7);
 
+  const priorSession = selectedDate && selectedDay
+    ? appData.sessions
+        .filter((s) => s.day === selectedDay && s.date < selectedDate)
+        .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+    : null;
+
   const isUpperDay = selectedDay?.startsWith('Upper') ?? false;
   const dayColor = isUpperDay ? 'var(--upper)' : 'var(--lower)';
 
@@ -190,6 +196,28 @@ export function LogPage() {
     updateEntry(exercise, setIndex, 'w', String(prevSet.w));
     updateEntry(exercise, setIndex, 'r', String(prevSet.r));
     if (prevSet.e !== null) updateEntry(exercise, setIndex, 'e', String(prevSet.e));
+  }
+
+  function fillFromLastSession() {
+    if (!selectedDay || isLocked || !priorSession) return;
+    setDraftSession((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        entries: prev.entries.map((entry) => {
+          const priorEntry = priorSession.entries.find((e) => e.exercise === entry.exercise);
+          if (!priorEntry) return entry;
+          return {
+            ...entry,
+            sets: entry.sets.map((set, i) => {
+              const ps = priorEntry.sets[i];
+              return ps ? { ...ps } : set;
+            }),
+          };
+        }),
+      };
+    });
+    showToast(`Filled from ${formatShortDate(priorSession.date)}`);
   }
 
   function persistSession() {
@@ -379,6 +407,26 @@ export function LogPage() {
                   onClick={removeSession}
                 >
                   Delete session
+                </button>
+              </div>
+            )}
+
+            {!isLocked && priorSession && (
+              <div className="same-as-last-banner">
+                <div>
+                  <span className="same-as-last-label">Same as last time?</span>
+                  <span className="same-as-last-meta">
+                    {formatShortDate(priorSession.date)}
+                    {calcVolume(priorSession) > 0 && ` · ${calcVolume(priorSession).toLocaleString()} kg`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="button-primary"
+                  style={{ minHeight: '38px', padding: '7px 18px', fontSize: '0.88rem' }}
+                  onClick={fillFromLastSession}
+                >
+                  Fill in
                 </button>
               </div>
             )}

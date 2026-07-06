@@ -587,6 +587,34 @@ label {
   font-size: 0.9rem;
 }
 
+/* ── Same as last time banner ───────────────────────────── */
+
+.same-as-last-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: rgba(74, 143, 232, 0.07);
+  border: 1px solid rgba(74, 143, 232, 0.2);
+  border-radius: 12px;
+}
+
+.same-as-last-label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.same-as-last-meta {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 /* ── Date navigation ────────────────────────────────────── */
 
 .date-nav-btn {
