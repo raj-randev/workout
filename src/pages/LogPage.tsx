@@ -698,8 +698,12 @@ export function LogPage() {
         const hasNext = setPopup.setIndex < totalSets - 1;
         const priorSet = getPriorSet(setPopup.exercise, setPopup.setIndex, selectedDay!, selectedDate, appData);
         const prevSet = setPopup.setIndex > 0 ? popupEntry.sets[setPopup.setIndex - 1] : null;
+        function closePopup() {
+          window.dispatchEvent(new CustomEvent('rest-timer-start'));
+          setSetPopup(null);
+        }
         return (
-          <div className="bottom-sheet-overlay" onClick={() => setSetPopup(null)}>
+          <div className="bottom-sheet-overlay" onClick={closePopup}>
             <div className="set-popup" onClick={(e) => e.stopPropagation()}>
               <div className="set-popup-handle" />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
@@ -714,7 +718,7 @@ export function LogPage() {
                 <button
                   type="button"
                   style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: '1.4rem', lineHeight: 1, padding: '4px', cursor: 'pointer' }}
-                  onClick={() => setSetPopup(null)}
+                  onClick={closePopup}
                 >
                   ×
                 </button>
@@ -776,7 +780,7 @@ export function LogPage() {
                 </button>
               ) : null}
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="button" className="button-pill" style={{ flex: 1 }} onClick={() => setSetPopup(null)}>
+                <button type="button" className="button-pill" style={{ flex: 1 }} onClick={closePopup}>
                   Done
                 </button>
                 {hasNext && (
@@ -784,7 +788,10 @@ export function LogPage() {
                     type="button"
                     className="button-primary"
                     style={{ flex: 2 }}
-                    onClick={() => setSetPopup({ exercise: setPopup.exercise, setIndex: setPopup.setIndex + 1 })}
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('rest-timer-start'));
+                      setSetPopup({ exercise: setPopup.exercise, setIndex: setPopup.setIndex + 1 });
+                    }}
                   >
                     Next set →
                   </button>

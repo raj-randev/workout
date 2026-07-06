@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import { getAuthState, login, logout } from './auth';
 import { LoginScreen } from './components/LoginScreen';
+import { RestTimer } from './components/RestTimer';
 import { FormPage } from './pages/FormPage';
 import { LogPage } from './pages/LogPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -18,6 +19,8 @@ function App() {
   const [authState, setAuthState] = useState(getAuthState);
   const [appData, setAppData] = useState<AppData>({ sessions: [], custom: [] });
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [restTimer, setRestTimer] = useState<{ seconds: number; total: number } | null>(null);
+  const [restDuration, setRestDuration] = useState(90);
 
   useEffect(() => {
     setAuthState(getAuthState());
@@ -32,6 +35,24 @@ function App() {
     const timeout = window.setTimeout(() => setSyncMessage(null), 3000);
     return () => window.clearTimeout(timeout);
   }, [syncMessage]);
+
+  // Tick the rest timer down
+  useEffect(() => {
+    if (!restTimer || restTimer.seconds <= 0) return;
+    const id = window.setTimeout(() => {
+      setRestTimer((prev) => prev ? { ...prev, seconds: prev.seconds - 1 } : null);
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [restTimer]);
+
+  // Start timer when a set popup closes
+  useEffect(() => {
+    const handler = () => {
+      setRestTimer({ seconds: restDuration, total: restDuration });
+    };
+    window.addEventListener('rest-timer-start', handler);
+    return () => window.removeEventListener('rest-timer-start', handler);
+  }, [restDuration]);
 
   function handleLogin(username: string, password: string) {
     const errorMessage = login(username, password);
@@ -76,6 +97,14 @@ function App() {
           <Route path="/form" element={<FormPage />} />
         </Routes>
       </main>
+      {restTimer && (
+        <RestTimer
+          seconds={restTimer.seconds}
+          total={restTimer.total}
+          onStart={(d) => { setRestDuration(d); setRestTimer({ seconds: d, total: d }); }}
+          onDismiss={() => setRestTimer(null)}
+        />
+      )}
     </div>
   );
 }

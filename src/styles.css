@@ -587,6 +587,111 @@ label {
   font-size: 0.9rem;
 }
 
+/* ── Rest timer ─────────────────────────────────────────── */
+
+.rest-timer {
+  position: fixed;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 12px 8px 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  animation: timer-in 0.22s ease;
+}
+
+@keyframes timer-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.rest-timer--done {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.rest-timer--urgent {
+  animation: timer-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%, 100% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55); }
+  50%       { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 5px rgba(245, 158, 11, 0.12); }
+}
+
+.rest-timer-time {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  min-width: 2.6ch;
+}
+
+.rest-timer-time.urgent {
+  color: #f59e0b;
+}
+
+.rest-timer-done-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.rest-timer-presets {
+  display: flex;
+  gap: 4px;
+}
+
+.rest-timer-preset {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: background 0.12s ease;
+}
+
+.rest-timer-preset:active {
+  background: rgba(74, 143, 232, 0.2);
+}
+
+.rest-timer-restart {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  padding: 2px 4px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.rest-timer-restart:active {
+  color: var(--ink);
+}
+
+.rest-timer-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  padding: 2px 2px;
+  line-height: 1;
+  margin-left: 2px;
+  transition: color 0.15s ease;
+}
+
+.rest-timer-dismiss:active {
+  color: var(--avoid);
+}
+
 /* ── Same as last time banner ───────────────────────────── */
 
 .same-as-last-banner {
