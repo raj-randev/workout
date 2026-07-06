@@ -389,6 +389,93 @@ label {
   padding: 9px 10px;
 }
 
+/* ── Set display rows (tap-to-edit) ─────────────────────── */
+
+.set-display-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  cursor: default;
+}
+
+.set-display-row--tap {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.set-display-row--tap:active {
+  background: rgba(74, 143, 232, 0.1);
+}
+
+.set-display-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.set-display-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.set-display-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-display-index {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-align: right;
+  align-self: center;
+}
+
+/* ── Bottom-sheet overlay ───────────────────────────────── */
+
+.bottom-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.set-popup {
+  width: min(520px, 100%);
+  background: var(--card);
+  border-radius: 22px 22px 0 0;
+  padding: 4px 20px max(28px, env(safe-area-inset-bottom));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+}
+
+.set-popup-handle {
+  width: 40px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  margin: 10px auto 18px;
+}
+
 /* ── Modal ──────────────────────────────────────────────── */
 
 .modal-overlay {

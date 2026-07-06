@@ -47,6 +47,7 @@ export function LogPage() {
   const [customError, setCustomError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
+  const [setPopup, setSetPopup] = useState<{ exercise: string; setIndex: number } | null>(null);
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
@@ -70,6 +71,7 @@ export function LogPage() {
     setSelectedDate(date);
     const existing = appData.sessions.find((s) => s.date === date);
     setSelectedDay(existing?.day ?? null);
+    setSetPopup(null);
   }
 
   function handleDaySelect(day: DayName) {
@@ -272,41 +274,27 @@ export function LogPage() {
                   </header>
                   <div className="card-body">
                     {entry.sets.map((set, i) => (
-                      <div className="set-row" key={`${entry.exercise}-${i}`}>
-                        <label>
-                          Weight
-                          <input
-                            type="number"
-                            min="0"
-                            value={set.w}
-                            readOnly={isLocked}
-                            style={isLocked ? { opacity: 0.65, cursor: 'default' } : undefined}
-                            onChange={(e) => updateEntry(entry.exercise, i, 'w', e.target.value)}
-                          />
-                        </label>
-                        <label>
-                          Reps
-                          <input
-                            type="number"
-                            min="0"
-                            value={set.r}
-                            readOnly={isLocked}
-                            style={isLocked ? { opacity: 0.65, cursor: 'default' } : undefined}
-                            onChange={(e) => updateEntry(entry.exercise, i, 'r', e.target.value)}
-                          />
-                        </label>
-                        <label>
-                          Effort
-                          <input
-                            type="number"
-                            min="0"
-                            value={set.e ?? ''}
-                            readOnly={isLocked}
-                            style={isLocked ? { opacity: 0.65, cursor: 'default' } : undefined}
-                            onChange={(e) => updateEntry(entry.exercise, i, 'e', e.target.value)}
-                          />
-                        </label>
-                      </div>
+                      <button
+                        key={`${entry.exercise}-${i}`}
+                        type="button"
+                        className={`set-display-row${!isLocked ? ' set-display-row--tap' : ''}`}
+                        disabled={isLocked}
+                        onClick={() => setSetPopup({ exercise: entry.exercise, setIndex: i })}
+                      >
+                        <div className="set-display-cell">
+                          <span className="set-display-label">Weight</span>
+                          <span className="set-display-value">{set.w || 0}</span>
+                        </div>
+                        <div className="set-display-cell">
+                          <span className="set-display-label">Reps</span>
+                          <span className="set-display-value">{set.r || 0}</span>
+                        </div>
+                        <div className="set-display-cell">
+                          <span className="set-display-label">Effort</span>
+                          <span className="set-display-value">{set.e ?? '—'}</span>
+                        </div>
+                        <span className="set-display-index">S{i + 1}</span>
+                      </button>
                     ))}
                     {/* Notes toggle */}
                     <button
@@ -489,6 +477,101 @@ export function LogPage() {
           </div>
         </div>
       )}
+
+      {/* ── Set entry popup ──────────────────────────── */}
+      {(() => {
+        if (!setPopup || !draftSession || isLocked) return null;
+        const popupEntry = draftSession.entries.find((e) => e.exercise === setPopup.exercise);
+        const popupSet = popupEntry?.sets[setPopup.setIndex];
+        if (!popupEntry || !popupSet) return null;
+        const totalSets = popupEntry.sets.length;
+        const hasNext = setPopup.setIndex < totalSets - 1;
+        return (
+          <div className="bottom-sheet-overlay" onClick={() => setSetPopup(null)}>
+            <div className="set-popup" onClick={(e) => e.stopPropagation()}>
+              <div className="set-popup-handle" />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '18px' }}>
+                <div>
+                  <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {setPopup.exercise}
+                  </p>
+                  <p style={{ margin: '2px 0 0', color: 'var(--accent)', fontWeight: 600, fontSize: '1rem' }}>
+                    Set {setPopup.setIndex + 1} of {totalSets}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: '1.4rem', lineHeight: 1, padding: '4px', cursor: 'pointer' }}
+                  onClick={() => setSetPopup(null)}
+                >
+                  ×
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <label>
+                  Weight (kg)
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    value={popupSet.w}
+                    autoFocus
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'w', e.target.value)}
+                    style={{ fontSize: '1.2rem', textAlign: 'center', padding: '14px 8px' }}
+                  />
+                </label>
+                <label>
+                  Reps
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    value={popupSet.r}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'r', e.target.value)}
+                    style={{ fontSize: '1.2rem', textAlign: 'center', padding: '14px 8px' }}
+                  />
+                </label>
+                <label>
+                  Effort
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="10"
+                    value={popupSet.e ?? ''}
+                    placeholder="—"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'e', e.target.value)}
+                    style={{ fontSize: '1.2rem', textAlign: 'center', padding: '14px 8px' }}
+                  />
+                </label>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="button-pill"
+                  style={{ flex: 1 }}
+                  onClick={() => setSetPopup(null)}
+                >
+                  Done
+                </button>
+                {hasNext && (
+                  <button
+                    type="button"
+                    className="button-primary"
+                    style={{ flex: 2 }}
+                    onClick={() => setSetPopup({ exercise: setPopup.exercise, setIndex: setPopup.setIndex + 1 })}
+                  >
+                    Next set →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
