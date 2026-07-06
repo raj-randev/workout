@@ -311,6 +311,14 @@ select {
   transition: border-color 0.15s ease;
 }
 
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
 input:focus,
 select:focus {
   outline: none;
