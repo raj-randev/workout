@@ -21,7 +21,8 @@ function App() {
   const [appData, setAppData] = useState<AppData>({ sessions: [], custom: [] });
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [restTimer, setRestTimer] = useState<{ seconds: number; total: number } | null>(null);
-  const [restDuration, setRestDuration] = useState(90);
+  const [setRestDuration, setSetRestDuration] = useState(60);
+  const [exerciseRestDuration, setExerciseRestDuration] = useState(90);
   const [restContext, setRestContext] = useState<TimerContext | null>(null);
 
   useEffect(() => {
@@ -69,20 +70,22 @@ function App() {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<Partial<TimerContext>>).detail ?? {};
-      // Request notification permission on first use
       if (Notification.permission === 'default') {
         void Notification.requestPermission();
       }
-      setRestContext(detail.exercise ? {
+      const ctx: TimerContext | null = detail.exercise ? {
         exercise: detail.exercise,
         isLastSet: detail.isLastSet ?? false,
         nextExercise: detail.nextExercise,
-      } : null);
-      setRestTimer({ seconds: restDuration, total: restDuration });
+      } : null;
+      setRestContext(ctx);
+      const isBetweenSets = ctx ? !ctx.isLastSet : false;
+      const duration = isBetweenSets ? setRestDuration : exerciseRestDuration;
+      setRestTimer({ seconds: duration, total: duration });
     };
     window.addEventListener('rest-timer-start', handler);
     return () => window.removeEventListener('rest-timer-start', handler);
-  }, [restDuration]);
+  }, [setRestDuration, exerciseRestDuration]);
 
   function handleLogin(username: string, password: string) {
     const errorMessage = login(username, password);
@@ -130,7 +133,11 @@ function App() {
           seconds={restTimer.seconds}
           total={restTimer.total}
           context={restContext}
-          onStart={(d) => { setRestDuration(d); setRestTimer({ seconds: d, total: d }); }}
+          onStart={(d) => {
+            const isBetweenSets = restContext ? !restContext.isLastSet : false;
+            if (isBetweenSets) setSetRestDuration(d); else setExerciseRestDuration(d);
+            setRestTimer({ seconds: d, total: d });
+          }}
           onDismiss={() => { setRestTimer(null); setRestContext(null); }}
         />
       )}

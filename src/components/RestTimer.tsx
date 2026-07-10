@@ -1,4 +1,11 @@
-const PRESETS = [
+const SET_PRESETS = [
+  { label: '30s', seconds: 30 },
+  { label: '45s', seconds: 45 },
+  { label: '60s', seconds: 60 },
+  { label: '90s', seconds: 90 },
+];
+
+const EXERCISE_PRESETS = [
   { label: '1m', seconds: 60 },
   { label: '1:30', seconds: 90 },
   { label: '2m', seconds: 120 },
@@ -23,6 +30,8 @@ type Props = {
 };
 
 export function RestTimer({ seconds, total, context, onStart, onDismiss }: Props) {
+  const isBetweenSets = context ? !context.isLastSet : false;
+  const presets = isBetweenSets ? SET_PRESETS : EXERCISE_PRESETS;
   const isDone = seconds <= 0;
   const isUrgent = !isDone && seconds <= 10;
   const fraction = total > 0 ? Math.max(0, seconds) / total : 0;
@@ -79,7 +88,7 @@ export function RestTimer({ seconds, total, context, onStart, onDismiss }: Props
 
         {/* Preset row */}
         <div className="rest-timer-preset-row">
-          {PRESETS.map((p) => (
+          {presets.map((p) => (
             <button
               key={p.seconds}
               type="button"
