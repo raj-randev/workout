@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from 'react-router-dom';
 import { getAuthState, login, logout } from './auth';
 import { LoginScreen } from './components/LoginScreen';
 import { RestTimer } from './components/RestTimer';
+import type { TimerContext } from './components/RestTimer';
 import { FormPage } from './pages/FormPage';
 import { LogPage } from './pages/LogPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -21,6 +22,7 @@ function App() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [restTimer, setRestTimer] = useState<{ seconds: number; total: number } | null>(null);
   const [restDuration, setRestDuration] = useState(90);
+  const [restContext, setRestContext] = useState<TimerContext | null>(null);
 
   useEffect(() => {
     setAuthState(getAuthState());
@@ -36,7 +38,7 @@ function App() {
     return () => window.clearTimeout(timeout);
   }, [syncMessage]);
 
-  // Tick the rest timer down
+  // Tick the rest timer
   useEffect(() => {
     if (!restTimer || restTimer.seconds <= 0) return;
     const id = window.setTimeout(() => {
@@ -45,9 +47,37 @@ function App() {
     return () => window.clearTimeout(id);
   }, [restTimer]);
 
-  // Start timer when a set popup closes
+  // When timer hits 0: notification + signal LogPage to scroll
   useEffect(() => {
-    const handler = () => {
+    if (restTimer?.seconds !== 0) return;
+    if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+      new Notification('Rest done!', {
+        body: restContext?.nextExercise
+          ? `Next up: ${restContext.nextExercise}`
+          : 'Time for your next set.',
+        silent: false,
+      });
+    }
+    if (restContext?.isLastSet) {
+      window.dispatchEvent(new CustomEvent('rest-timer-done', {
+        detail: { nextExercise: restContext.nextExercise },
+      }));
+    }
+  }, [restTimer?.seconds, restContext]);
+
+  // Listen for timer start from LogPage
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<Partial<TimerContext>>).detail ?? {};
+      // Request notification permission on first use
+      if (Notification.permission === 'default') {
+        void Notification.requestPermission();
+      }
+      setRestContext(detail.exercise ? {
+        exercise: detail.exercise,
+        isLastSet: detail.isLastSet ?? false,
+        nextExercise: detail.nextExercise,
+      } : null);
       setRestTimer({ seconds: restDuration, total: restDuration });
     };
     window.addEventListener('rest-timer-start', handler);
@@ -56,9 +86,7 @@ function App() {
 
   function handleLogin(username: string, password: string) {
     const errorMessage = login(username, password);
-    if (!errorMessage) {
-      setAuthState(getAuthState());
-    }
+    if (!errorMessage) setAuthState(getAuthState());
     return errorMessage;
   }
 
@@ -101,8 +129,9 @@ function App() {
         <RestTimer
           seconds={restTimer.seconds}
           total={restTimer.total}
+          context={restContext}
           onStart={(d) => { setRestDuration(d); setRestTimer({ seconds: d, total: d }); }}
-          onDismiss={() => setRestTimer(null)}
+          onDismiss={() => { setRestTimer(null); setRestContext(null); }}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DAYS } from '../data/days';
-import { addCustomExercise, createSessionDraft, deleteSession, findSession, loadAppDataAsync, removeCustomExercise, saveAppData } from '../storage';
+import { addCustomExercise, clearDraftSession, createSessionDraft, deleteSession, findSession, loadAppDataAsync, loadDraftSession, removeCustomExercise, saveAppData, saveDraftSession } from '../storage';
 import type { AppData, DayName, Session, SetEntry } from '../types';
 
 const dayNames: DayName[] = ['Lower A', 'Upper A', 'Lower B', 'Upper B'];
@@ -85,8 +85,11 @@ export function LogPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPartial, setIsPartial] = useState(false);
+  const [historyExercise, setHistoryExercise] = useState<string | null>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const exerciseRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const autoSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
@@ -106,13 +109,39 @@ export function LogPage() {
       return;
     }
     const stored = findSession(selectedDate, selectedDay, appData);
-    setDraftSession(stored ?? createSessionDraft(selectedDate, selectedDay, appData.custom));
+    if (stored) { setDraftSession(stored); return; }
+    // Restore auto-saved draft if one exists for this date/day
+    const draft = loadDraftSession(selectedDate, selectedDay);
+    setDraftSession(draft ?? createSessionDraft(selectedDate, selectedDay, appData.custom));
   }, [selectedDate, selectedDay, appData]);
+
+  // Scroll to next exercise when rest-timer-done fires
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { nextExercise } = (e as CustomEvent<{ nextExercise?: string }>).detail;
+      if (nextExercise) {
+        const el = exerciseRefs.current.get(nextExercise);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    window.addEventListener('rest-timer-done', handler);
+    return () => window.removeEventListener('rest-timer-done', handler);
+  }, []);
 
   const currentSession = selectedDate && selectedDay
     ? (findSession(selectedDate, selectedDay, appData) ?? null)
     : null;
   const isLocked = currentSession !== null;
+
+  // Auto-save draft every 5 seconds when unsaved data exists
+  useEffect(() => {
+    if (!draftSession || isLocked || !selectedDate || !selectedDay) return;
+    const hasData = draftSession.entries.some((e) => e.sets.some((s) => s.w > 0 || s.r > 0));
+    if (!hasData) return;
+    if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(() => saveDraftSession(draftSession), 5000);
+    return () => { if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current); };
+  }, [draftSession, isLocked, selectedDate, selectedDay]);
 
   const recentSessions = [...appData.sessions]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -123,6 +152,19 @@ export function LogPage() {
         .filter((s) => s.day === selectedDay && s.date < selectedDate)
         .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
     : null;
+
+  const historyData = useMemo(() => {
+    if (!historyExercise) return [];
+    return appData.sessions
+      .filter((s) => s.entries.some((e) => e.exercise === historyExercise))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((s) => ({
+        date: s.date,
+        day: s.day,
+        partial: s.partial,
+        sets: s.entries.find((e) => e.exercise === historyExercise)?.sets ?? [],
+      }));
+  }, [historyExercise, appData.sessions]);
 
   const isUpperDay = selectedDay?.startsWith('Upper') ?? false;
   const dayColor = isUpperDay ? 'var(--upper)' : 'var(--lower)';
@@ -236,6 +278,7 @@ export function LogPage() {
     };
     setAppData(nextData);
     saveAppData(nextData);
+    clearDraftSession();
     const vol = calcVolume(sessionToSave);
     const partialNote = isPartial ? ' · incomplete' : '';
     showToast(vol > 0 ? `Session saved · ${vol.toLocaleString()} kg total${partialNote}` : 'Session saved');
@@ -248,6 +291,7 @@ export function LogPage() {
   function confirmDelete() {
     if (!selectedDay) return;
     setShowDeleteConfirm(false);
+    clearDraftSession();
     const nextData = deleteSession(selectedDate, selectedDay, appData);
     setAppData(nextData);
     saveAppData(nextData);
@@ -466,12 +510,20 @@ export function LogPage() {
                   <article
                     className="exercise-card"
                     key={entry.exercise}
+                    ref={(el) => { if (el) exerciseRefs.current.set(entry.exercise, el); }}
                     style={{ borderTopColor: dayColor }}
                   >
                     <header>
                       <div>
-                        <h3>{entry.exercise}</h3>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}
+                          onClick={() => setHistoryExercise(entry.exercise)}
+                        >
+                          <h3 style={{ margin: 0 }}>{entry.exercise}</h3>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '2px', display: 'block' }}>tap for history</span>
+                        </button>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                           <span className="badge">{entry.sets.length} sets</span>
                           {repRange && (
                             <span className={`badge ${isUpperDay ? 'day-upper' : 'day-lower'}`}>
@@ -738,7 +790,14 @@ export function LogPage() {
         const priorSet = getPriorSet(setPopup.exercise, setPopup.setIndex, selectedDay!, selectedDate, appData);
         const prevSet = setPopup.setIndex > 0 ? popupEntry.sets[setPopup.setIndex - 1] : null;
         function closePopup() {
-          window.dispatchEvent(new CustomEvent('rest-timer-start'));
+          const session = draftSession!;
+          const popup = setPopup!;
+          const exerciseIndex = session.entries.findIndex((e) => e.exercise === popup.exercise);
+          const isLastSet = popup.setIndex === totalSets - 1;
+          const nextExercise = isLastSet ? session.entries[exerciseIndex + 1]?.exercise : undefined;
+          window.dispatchEvent(new CustomEvent('rest-timer-start', {
+            detail: { exercise: popup.exercise, isLastSet, nextExercise },
+          }));
           setSetPopup(null);
         }
         return (
@@ -828,7 +887,9 @@ export function LogPage() {
                     className="button-primary"
                     style={{ flex: 2 }}
                     onClick={() => {
-                      window.dispatchEvent(new CustomEvent('rest-timer-start'));
+                      window.dispatchEvent(new CustomEvent('rest-timer-start', {
+                        detail: { exercise: setPopup.exercise, isLastSet: false },
+                      }));
                       setSetPopup({ exercise: setPopup.exercise, setIndex: setPopup.setIndex + 1 });
                     }}
                   >
@@ -840,6 +901,44 @@ export function LogPage() {
           </div>
         );
       })()}
+
+      {/* ── Exercise history drawer ──────────────────── */}
+      {historyExercise && (
+        <div className="modal-overlay" onClick={() => setHistoryExercise(null)}>
+          <div className="modal-panel history-panel" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0 }}>{historyExercise}</h3>
+              <button
+                type="button"
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: '1.4rem', lineHeight: 1, cursor: 'pointer', padding: '4px' }}
+                onClick={() => setHistoryExercise(null)}
+              >×</button>
+            </div>
+            {historyData.length === 0 ? (
+              <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>No history yet for this exercise.</p>
+            ) : (
+              <div className="history-drawer-list">
+                {historyData.map((session) => (
+                  <div key={session.date} className="history-drawer-item">
+                    <div className="history-drawer-header">
+                      <span className="history-drawer-date">{session.date}</span>
+                      <span className={`history-drawer-day ${session.day.startsWith('Upper') ? 'upper' : 'lower'}`}>{session.day}</span>
+                      {session.partial && <span style={{ fontSize: '0.7rem', color: '#f59e0b' }}>incomplete</span>}
+                    </div>
+                    <div className="history-drawer-sets">
+                      {session.sets.map((set, i) => (
+                        <span key={i} className="history-drawer-set">
+                          S{i + 1}: {set.w}kg × {set.r}{set.e !== null ? ` @${set.e}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Toast ─────────────────────────────────────── */}
       {toast && <div className="toast">{toast}</div>}

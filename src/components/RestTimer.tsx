@@ -5,17 +5,24 @@ const PRESETS = [
   { label: '3m', seconds: 180 },
 ];
 
-const R = 13;
-const CIRCUMFERENCE = 2 * Math.PI * R; // ≈ 81.68
+const R = 54;
+const CIRCUMFERENCE = 2 * Math.PI * R;
+
+export type TimerContext = {
+  exercise: string;
+  isLastSet: boolean;
+  nextExercise?: string;
+};
 
 type Props = {
   seconds: number;
   total: number;
+  context: TimerContext | null;
   onStart: (duration: number) => void;
   onDismiss: () => void;
 };
 
-export function RestTimer({ seconds, total, onStart, onDismiss }: Props) {
+export function RestTimer({ seconds, total, context, onStart, onDismiss }: Props) {
   const isDone = seconds <= 0;
   const isUrgent = !isDone && seconds <= 10;
   const fraction = total > 0 ? Math.max(0, seconds) / total : 0;
@@ -26,45 +33,74 @@ export function RestTimer({ seconds, total, onStart, onDismiss }: Props) {
   const arcColor = isDone ? 'var(--ok)' : isUrgent ? '#f59e0b' : 'var(--accent)';
 
   return (
-    <div className={`rest-timer${isDone ? ' rest-timer--done' : ''}${isUrgent ? ' rest-timer--urgent' : ''}`}>
-      <svg width="32" height="32" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
-        <circle cx="16" cy="16" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
-        <circle
-          cx="16" cy="16" r={R}
-          fill="none"
-          stroke={arcColor}
-          strokeWidth="2.5"
-          strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={dashOffset}
-          strokeLinecap="round"
-          transform="rotate(-90 16 16)"
-          style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s ease' }}
-        />
-      </svg>
+    <div className="rest-timer-overlay" onClick={onDismiss}>
+      <div className={`rest-timer-modal${isUrgent ? ' urgent' : ''}${isDone ? ' done' : ''}`} onClick={(e) => e.stopPropagation()}>
 
-      {isDone ? (
-        <>
-          <span className="rest-timer-done-label">Rest done!</span>
-          <div className="rest-timer-presets">
-            {PRESETS.map((p) => (
-              <button key={p.seconds} type="button" className="rest-timer-preset" onClick={() => onStart(p.seconds)}>
-                {p.label}
-              </button>
-            ))}
+        <button type="button" className="rest-timer-close" onClick={onDismiss} aria-label="Dismiss timer">×</button>
+
+        {/* Large arc ring */}
+        <div className="rest-timer-ring-wrap">
+          <svg width="140" height="140" viewBox="0 0 140 140" style={{ display: 'block' }}>
+            <circle cx="70" cy="70" r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="7" />
+            <circle
+              cx="70" cy="70" r={R}
+              fill="none"
+              stroke={arcColor}
+              strokeWidth="7"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={dashOffset}
+              strokeLinecap="round"
+              transform="rotate(-90 70 70)"
+              style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s ease' }}
+            />
+          </svg>
+          <div className="rest-timer-ring-center">
+            {isDone
+              ? <span className="rest-timer-done-check">✓</span>
+              : <span className={`rest-timer-big-time${isUrgent ? ' urgent' : ''}`}>{timeDisplay}</span>
+            }
           </div>
-        </>
-      ) : (
-        <>
-          <span className={`rest-timer-time${isUrgent ? ' urgent' : ''}`}>{timeDisplay}</span>
-          <button type="button" className="rest-timer-restart" onClick={() => onStart(total)} aria-label="Restart timer">
-            ↺
-          </button>
-        </>
-      )}
+        </div>
 
-      <button type="button" className="rest-timer-dismiss" onClick={onDismiss} aria-label="Dismiss timer">
-        ×
-      </button>
+        {/* Status */}
+        {isDone ? (
+          <div className="rest-timer-done-info">
+            <p className="rest-timer-done-title">Rest complete</p>
+            {context?.nextExercise && (
+              <p className="rest-timer-next-exercise">Next up: {context.nextExercise}</p>
+            )}
+          </div>
+        ) : (
+          <p className="rest-timer-exercise-label">
+            {context?.exercise ?? 'Rest timer'}
+            {context && !context.isLastSet && <span className="rest-timer-set-hint"> · set rest</span>}
+          </p>
+        )}
+
+        {/* Preset row */}
+        <div className="rest-timer-preset-row">
+          {PRESETS.map((p) => (
+            <button
+              key={p.seconds}
+              type="button"
+              className={`rest-timer-preset-btn${p.seconds === total ? ' active' : ''}`}
+              onClick={() => onStart(p.seconds)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Primary action */}
+        <button
+          type="button"
+          className="button-primary"
+          style={{ width: '100%', minHeight: '52px', fontSize: '1rem', marginTop: '4px' }}
+          onClick={isDone ? onDismiss : () => onStart(total)}
+        >
+          {isDone ? 'Continue' : '↺  Restart'}
+        </button>
+      </div>
     </div>
   );
 }

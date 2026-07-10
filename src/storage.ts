@@ -104,3 +104,27 @@ export function removeCustomExercise(name: string, day: DayName, data: AppData):
     custom: data.custom.filter((exercise) => !(exercise.name === name && exercise.day === day)),
   };
 }
+
+const DRAFT_KEY = 'lift-log-draft';
+
+export function saveDraftSession(session: Session): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(session));
+}
+
+export function loadDraftSession(date: string, day: DayName): Session | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(DRAFT_KEY);
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw) as Session;
+    return data.date === date && data.day === day ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearDraftSession(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(DRAFT_KEY);
+}
