@@ -587,6 +587,96 @@ label {
   font-size: 0.9rem;
 }
 
+/* ── Searchable exercise dropdown ───────────────────────── */
+
+.exercise-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.exercise-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  cursor: text;
+  transition: border-color 0.15s ease;
+}
+
+.exercise-search-field:focus-within {
+  border-color: rgba(74, 143, 232, 0.5);
+}
+
+.exercise-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.exercise-search-input:focus {
+  outline: none;
+}
+
+.exercise-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 6px;
+  z-index: 15;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  scrollbar-width: thin;
+}
+
+.exercise-dropdown-group {
+  margin: 6px 0 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.exercise-dropdown-group.lower { color: var(--lower); }
+.exercise-dropdown-group.upper { color: var(--upper); }
+
+.exercise-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 0.92rem;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.exercise-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.exercise-dropdown-item.active {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-dim);
+}
+
 /* ── Rest timer ─────────────────────────────────────────── */
 
 .rest-timer {

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { EXERCISES } from '../data/exercises';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { DAYS } from '../data/days';
 import { loadAppDataAsync } from '../storage';
 import type { Session } from '../types';
 
@@ -33,6 +33,9 @@ export function ProgressPage() {
   const [exercise, setExercise] = useState('Leg Press');
   const [range, setRange] = useState<typeof rangeOptions[number]>('1M');
   const [appData, setAppData] = useState<{ sessions: Session[]; custom: any[] }>({ sessions: [], custom: [] });
+  const [exerciseSearch, setExerciseSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
@@ -47,10 +50,34 @@ export function ProgressPage() {
     };
   }, []);
 
-  const exerciseNames = useMemo(() => {
-    const custom = appData.custom.map((item) => item.name);
-    return Array.from(new Set([...Object.keys(EXERCISES), ...custom])).sort();
-  }, [appData.custom]);
+  // Click-outside closes the dropdown
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+        setExerciseSearch('');
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  const groupedExercises = useMemo(() => {
+    const q = exerciseSearch.toLowerCase().trim();
+    const lower = new Set<string>();
+    const upper = new Set<string>();
+    Object.entries(DAYS).forEach(([day, exercises]) => {
+      const isUpper = day.startsWith('Upper');
+      exercises.forEach(([name]) => {
+        if (!q || name.toLowerCase().includes(q)) (isUpper ? upper : lower).add(name);
+      });
+    });
+    appData.custom.forEach((c) => {
+      const isUpper = c.day.startsWith('Upper');
+      if (!q || c.name.toLowerCase().includes(q)) (isUpper ? upper : lower).add(c.name);
+    });
+    return { Lower: Array.from(lower).sort(), Upper: Array.from(upper).sort() };
+  }, [exerciseSearch, appData.custom]);
 
   const filteredSessions = useMemo(() => {
     const cutoff = getCutoffDate(range);
@@ -101,16 +128,51 @@ export function ProgressPage() {
       </header>
 
       <div className="controls-row">
-        <label style={{ flex: 1, minWidth: '220px' }}>
-          Exercise
-          <select value={exercise} onChange={(event) => setExercise(event.target.value)}>
-            {exerciseNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div ref={searchRef} className="exercise-search-wrapper">
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: 'var(--muted)', marginBottom: '6px' }}>
+            Exercise
+          </label>
+          <div className="exercise-search-field" onClick={() => setDropdownOpen(true)}>
+            <input
+              type="text"
+              className="exercise-search-input"
+              placeholder={exercise}
+              value={exerciseSearch}
+              onFocus={() => setDropdownOpen(true)}
+              onChange={(e) => setExerciseSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setDropdownOpen(false); setExerciseSearch(''); } }}
+            />
+            <span style={{ color: 'var(--muted)', fontSize: '0.8rem', flexShrink: 0, pointerEvents: 'none' }}>▾</span>
+          </div>
+          {dropdownOpen && (
+            <div className="exercise-dropdown">
+              {(['Lower', 'Upper'] as const).map((group) => {
+                const items = groupedExercises[group];
+                if (!items.length) return null;
+                return (
+                  <div key={group}>
+                    <p className={`exercise-dropdown-group ${group.toLowerCase()}`}>{group}</p>
+                    {items.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className={`exercise-dropdown-item${name === exercise ? ' active' : ''}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setExercise(name);
+                          setExerciseSearch('');
+                          setDropdownOpen(false);
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {rangeOptions.map((option) => (
             <button

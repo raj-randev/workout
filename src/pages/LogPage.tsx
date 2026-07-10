@@ -298,7 +298,12 @@ export function LogPage() {
       {/* ── Log session ─────────────────────────────── */}
       <section className="section-card">
         <p className="eyebrow">Workout log</p>
-        <h2 style={{ marginTop: 0, marginBottom: '18px' }}>Log session</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '18px' }}>
+          <h2 style={{ margin: 0 }}>Log session</h2>
+          <a href="#custom-exercises" style={{ fontSize: '0.8rem', color: 'var(--muted)', textDecoration: 'none' }}>
+            Custom exercises ↓
+          </a>
+        </div>
 
         {/* Date field with Log today + nav arrows */}
         <div className="date-field">
@@ -550,7 +555,7 @@ export function LogPage() {
       </section>
 
       {/* ── Custom exercises ─────────────────────────── */}
-      <section className="section-card">
+      <section id="custom-exercises" className="section-card">
         <p className="eyebrow">Your exercises</p>
         <h2 style={{ marginTop: 0, marginBottom: '14px' }}>Custom exercises</h2>
 
