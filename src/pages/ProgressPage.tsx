@@ -112,6 +112,7 @@ export function ProgressPage() {
   const isNewPB = useMemo(() => {
     if (filteredSessions.length < 2) return false;
     const lastSession = filteredSessions[filteredSessions.length - 1];
+    if (lastSession.partial) return false;
     const lastWeight = getTopWeight(lastSession, exercise);
     return lastWeight === maxWeight && filteredSessions.slice(0, -1).every((s) => getTopWeight(s, exercise) < lastWeight);
   }, [filteredSessions, exercise, maxWeight]);
@@ -120,7 +121,98 @@ export function ProgressPage() {
     ? `${filteredSessions[0].date} – ${filteredSessions[filteredSessions.length - 1].date}`
     : null;
 
+  const { streak, heatmapDays } = useMemo(() => {
+    const todayDate = new Date();
+    const todayStr = todayDate.toISOString().slice(0, 10);
+    const sessionMap = new Map<string, 'lower' | 'upper'>();
+    appData.sessions.forEach((s) => {
+      if (!sessionMap.has(s.date)) sessionMap.set(s.date, s.day.startsWith('Upper') ? 'upper' : 'lower');
+    });
+
+    // Streak: consecutive days with a session going back from today
+    let streakCount = 0;
+    const d = new Date(todayDate);
+    while (sessionMap.has(d.toISOString().slice(0, 10))) {
+      streakCount++;
+      d.setDate(d.getDate() - 1);
+    }
+
+    // 12-week heatmap aligned to Monday
+    const dow = todayDate.getDay(); // 0=Sun
+    const daysToMon = dow === 0 ? 6 : dow - 1;
+    const lastMonday = new Date(todayDate);
+    lastMonday.setDate(todayDate.getDate() - daysToMon);
+    const startDate = new Date(lastMonday);
+    startDate.setDate(lastMonday.getDate() - 11 * 7); // 12 weeks back
+
+    const days = Array.from({ length: 84 }, (_, i) => {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const str = date.toISOString().slice(0, 10);
+      return { date: str, type: sessionMap.get(str) ?? null, isToday: str === todayStr };
+    });
+
+    return { streak: streakCount, heatmapDays: days };
+  }, [appData.sessions]);
+
   return (
+    <div style={{ display: 'grid', gap: '16px' }}>
+    {/* ── Consistency card ─────────────────────────── */}
+    <section className="section-card">
+      <p className="eyebrow">Consistency</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
+        <h2 style={{ margin: 0 }}>Training heatmap</h2>
+        {streak > 0 && (
+          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--ok)' }}>
+            {streak} day streak
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+        {/* Day labels */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', paddingTop: '1px' }}>
+          {['M','T','W','T','F','S','S'].map((label, i) => (
+            <span key={i} style={{ fontSize: '0.62rem', color: 'var(--muted)', width: '10px', height: '16px', lineHeight: '16px', textAlign: 'center' }}>{label}</span>
+          ))}
+        </div>
+        {/* Grid: 12 columns (weeks) × 7 rows (days) */}
+        <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 16px)', gridAutoFlow: 'column', gridAutoColumns: '1fr', gap: '3px', flex: 1 }}>
+          {heatmapDays.map((cell) => (
+            <div
+              key={cell.date}
+              title={cell.date}
+              style={{
+                borderRadius: '3px',
+                background: cell.type === 'lower'
+                  ? 'rgba(15,184,168,0.65)'
+                  : cell.type === 'upper'
+                  ? 'rgba(129,140,248,0.65)'
+                  : 'rgba(255,255,255,0.06)',
+                outline: cell.isToday ? '2px solid var(--accent)' : undefined,
+                outlineOffset: '1px',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '14px', marginTop: '12px' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: 'var(--muted)' }}>
+          <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(15,184,168,0.65)' }} />
+          Lower
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: 'var(--muted)' }}>
+          <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(129,140,248,0.65)' }} />
+          Upper
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: 'var(--muted)' }}>
+          <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)', outline: '2px solid var(--accent)', outlineOffset: '1px' }} />
+          Today
+        </span>
+      </div>
+    </section>
+
+    {/* ── Exercise chart card ───────────────────────── */}
     <section className="section-card">
       <header>
         <p className="eyebrow">Progress</p>
@@ -282,6 +374,9 @@ export function ProgressPage() {
               <div key={`${session.date}-${session.day}`} className="history-item">
                 <div>
                   <strong>{session.date}</strong> · {session.day}
+                  {session.partial && (
+                    <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#f59e0b', fontWeight: 600 }}>incomplete</span>
+                  )}
                 </div>
                 <div>{getTopWeight(session, exercise)}kg</div>
               </div>
@@ -290,5 +385,6 @@ export function ProgressPage() {
         </div>
       )}
     </section>
+    </div>
   );
 }

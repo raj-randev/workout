@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DAYS } from '../data/days';
 import { addCustomExercise, createSessionDraft, deleteSession, findSession, loadAppDataAsync, removeCustomExercise, saveAppData } from '../storage';
 import type { AppData, DayName, Session, SetEntry } from '../types';
@@ -84,6 +84,9 @@ export function LogPage() {
   const [setPopup, setSetPopup] = useState<{ exercise: string; setIndex: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isPartial, setIsPartial] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
@@ -97,6 +100,7 @@ export function LogPage() {
   }, []);
 
   useEffect(() => {
+    setIsPartial(false);
     if (!selectedDate || !selectedDay) {
       setDraftSession(null);
       return;
@@ -222,17 +226,19 @@ export function LogPage() {
 
   function persistSession() {
     if (!draftSession || !selectedDay) return;
+    const sessionToSave = isPartial ? { ...draftSession, partial: true } : draftSession;
     const filtered = appData.sessions.filter(
       (s) => !(s.date === selectedDate && s.day === selectedDay),
     );
     const nextData: AppData = {
       ...appData,
-      sessions: [...filtered, draftSession].sort((a, b) => a.date.localeCompare(b.date)),
+      sessions: [...filtered, sessionToSave].sort((a, b) => a.date.localeCompare(b.date)),
     };
     setAppData(nextData);
     saveAppData(nextData);
-    const vol = calcVolume(draftSession);
-    showToast(vol > 0 ? `Session saved · ${vol.toLocaleString()} kg total` : 'Session saved');
+    const vol = calcVolume(sessionToSave);
+    const partialNote = isPartial ? ' · incomplete' : '';
+    showToast(vol > 0 ? `Session saved · ${vol.toLocaleString()} kg total${partialNote}` : 'Session saved');
   }
 
   function removeSession() {
@@ -294,7 +300,19 @@ export function LogPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: '16px' }}>
+    <div
+      style={{ display: 'grid', gap: '16px' }}
+      onTouchStart={(e) => {
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+      }}
+      onTouchEnd={(e) => {
+        if (setPopup || showDeleteConfirm || isCustomModalOpen || !selectedDate) return;
+        const dx = e.changedTouches[0].clientX - touchStartX.current;
+        const dy = e.changedTouches[0].clientY - touchStartY.current;
+        if (Math.abs(dx) > 60 && Math.abs(dy) < 80) stepDate(dx < 0 ? 1 : -1);
+      }}
+    >
       {/* ── Log session ─────────────────────────────── */}
       <section className="section-card">
         <p className="eyebrow">Workout log</p>
@@ -397,11 +415,16 @@ export function LogPage() {
           <>
             {isLocked && (
               <div className="session-locked-banner">
-                <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Session saved — read only</span>
                   {calcVolume(draftSession) > 0 && (
-                    <span style={{ color: 'var(--ok)', fontSize: '0.82rem', marginLeft: '10px' }}>
-                      {calcVolume(draftSession).toLocaleString()} kg total
+                    <span style={{ color: 'var(--ok)', fontSize: '0.82rem' }}>
+                      {calcVolume(draftSession).toLocaleString()} kg
+                    </span>
+                  )}
+                  {currentSession?.partial && (
+                    <span style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '999px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em' }}>
+                      INCOMPLETE
                     </span>
                   )}
                 </div>
@@ -539,9 +562,20 @@ export function LogPage() {
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginTop: '18px' }}>
               {!isLocked && (
-                <button className="button-primary" type="button" onClick={persistSession}>
-                  Save session
-                </button>
+                <>
+                  <button className="button-primary" type="button" onClick={persistSession}>
+                    Save session
+                  </button>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={isPartial}
+                      onChange={(e) => setIsPartial(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#f59e0b', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Mark as incomplete</span>
+                  </label>
+                </>
               )}
               <button className="button-pill" type="button" onClick={copyForClaude}>
                 Copy for Claude

@@ -16,6 +16,7 @@ export type Session = {
   date: string;
   day: DayName;
   entries: ExerciseEntry[];
+  partial?: boolean;
 };
 
 export type CustomExercise = {
