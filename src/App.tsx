@@ -48,7 +48,7 @@ function App() {
     return () => window.clearTimeout(id);
   }, [restTimer]);
 
-  // When timer hits 0: notification + signal LogPage to scroll
+  // When timer hits 0: notification only
   useEffect(() => {
     if (restTimer?.seconds !== 0) return;
     if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
@@ -58,11 +58,6 @@ function App() {
           : 'Time for your next set.',
         silent: false,
       });
-    }
-    if (restContext?.isLastSet) {
-      window.dispatchEvent(new CustomEvent('rest-timer-done', {
-        detail: { nextExercise: restContext.nextExercise },
-      }));
     }
   }, [restTimer?.seconds, restContext]);
 
@@ -138,7 +133,15 @@ function App() {
             if (isBetweenSets) setSetRestDuration(d); else setExerciseRestDuration(d);
             setRestTimer({ seconds: d, total: d });
           }}
-          onDismiss={() => { setRestTimer(null); setRestContext(null); }}
+          onDismiss={() => {
+            if (restContext?.isLastSet) {
+              window.dispatchEvent(new CustomEvent('rest-timer-done', {
+                detail: { nextExercise: restContext.nextExercise },
+              }));
+            }
+            setRestTimer(null);
+            setRestContext(null);
+          }}
         />
       )}
     </div>
