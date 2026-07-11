@@ -80,6 +80,7 @@ export function LogPage() {
   const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
   const [setPopup, setSetPopup] = useState<{ exercise: string; setIndex: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [savedSummary, setSavedSummary] = useState<{ volume: number; sets: number; partial: boolean } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPartial, setIsPartial] = useState(false);
   const [historyExercise, setHistoryExercise] = useState<string | null>(null);
@@ -278,8 +279,11 @@ export function LogPage() {
     saveAppData(nextData);
     clearDraftSession();
     const vol = calcVolume(sessionToSave);
-    const partialNote = isPartial ? ' · incomplete' : '';
-    showToast(vol > 0 ? `Session saved · ${vol.toLocaleString()} kg total${partialNote}` : 'Session saved');
+    const totalSets = sessionToSave.entries.reduce(
+      (n, e) => n + e.sets.filter((s) => s.w > 0 || s.r > 0).length, 0
+    );
+    setSavedSummary({ volume: vol, sets: totalSets, partial: isPartial });
+    window.setTimeout(() => setSavedSummary(null), 4000);
   }
 
   function removeSession() {
@@ -853,7 +857,7 @@ export function LogPage() {
                   />
                 </label>
                 <label>
-                  Effort
+                  Effort <span style={{ fontSize: '0.65rem', color: 'var(--muted)', fontWeight: 400 }}>1–10</span>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -944,6 +948,23 @@ export function LogPage() {
 
       {/* ── Toast ─────────────────────────────────────── */}
       {toast && <div className="toast">{toast}</div>}
+
+      {/* ── Session saved summary ─────────────────────── */}
+      {savedSummary && (
+        <div className="session-summary-banner">
+          <div className="session-summary-title">
+            <span>✓</span>
+            <span>Session saved{savedSummary.partial ? ' · incomplete' : ''}</span>
+          </div>
+          {savedSummary.volume > 0 && (
+            <div className="session-summary-stats">
+              <span>{savedSummary.volume.toLocaleString()} kg lifted</span>
+              <span className="session-summary-dot">·</span>
+              <span>{savedSummary.sets} sets logged</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

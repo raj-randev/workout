@@ -28,9 +28,20 @@ function getTopWeight(session: Session, exercise: string) {
   return Math.max(...entry.sets.map((set) => set.w));
 }
 
+function getSessionVolume(session: Session, exercise: string) {
+  const entry = session.entries.find((item) => item.exercise === exercise);
+  return entry?.sets.reduce((sum, set) => sum + set.w * set.r, 0) ?? 0;
+}
+
+function formatVal(v: number, metric: 'weight' | 'volume') {
+  if (metric === 'volume') return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v));
+  return `${v}kg`;
+}
+
 export function ProgressPage() {
   const [exercise, setExercise] = useState('Leg Press');
   const [range, setRange] = useState<typeof rangeOptions[number]>('1M');
+  const [metric, setMetric] = useState<'weight' | 'volume'>('weight');
   const [appData, setAppData] = useState<AppData>({ sessions: [], custom: [] });
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -90,10 +101,13 @@ export function ProgressPage() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [appData.sessions, exercise, range]);
 
+  const getVal = (session: Session) =>
+    metric === 'volume' ? getSessionVolume(session, exercise) : getTopWeight(session, exercise);
+
   const chartPoints = useMemo(() => {
     const values = filteredSessions.map((session) => ({
       date: session.date,
-      value: getTopWeight(session, exercise),
+      value: metric === 'volume' ? getSessionVolume(session, exercise) : getTopWeight(session, exercise),
     }));
     const rawMax = Math.max(...values.map((v) => v.value), 1);
     const rawMin = Math.min(...values.map((v) => v.value));
@@ -101,21 +115,34 @@ export function ProgressPage() {
     return values.map((item, index) => ({
       ...item,
       x: values.length > 1 ? (index / (values.length - 1)) * 188 + 6 : 100,
-      // span=0 means all values equal — centre the line
       y: span === 0 ? 46 : 80 - ((item.value - rawMin) / span) * 68,
     }));
-  }, [filteredSessions, exercise]);
+  }, [filteredSessions, exercise, metric]);
 
-  const maxWeight = useMemo(() => Math.max(...filteredSessions.map((session) => getTopWeight(session, exercise)), 0), [filteredSessions, exercise]);
-  const minWeight = useMemo(() => filteredSessions.length ? Math.min(...filteredSessions.map((session) => getTopWeight(session, exercise))) : 0, [filteredSessions, exercise]);
+  const maxVal = useMemo(() => Math.max(...filteredSessions.map(getVal), 0), [filteredSessions, exercise, metric]);
+  const minVal = useMemo(() => filteredSessions.length ? Math.min(...filteredSessions.map(getVal)) : 0, [filteredSessions, exercise, metric]);
 
   const isNewPB = useMemo(() => {
-    if (filteredSessions.length < 2) return false;
+    if (filteredSessions.length < 2 || metric !== 'weight') return false;
     const lastSession = filteredSessions[filteredSessions.length - 1];
     if (lastSession.partial) return false;
     const lastWeight = getTopWeight(lastSession, exercise);
-    return lastWeight === maxWeight && filteredSessions.slice(0, -1).every((s) => getTopWeight(s, exercise) < lastWeight);
-  }, [filteredSessions, exercise, maxWeight]);
+    return lastWeight === maxVal && filteredSessions.slice(0, -1).every((s) => getTopWeight(s, exercise) < lastWeight);
+  }, [filteredSessions, exercise, maxVal, metric]);
+
+  const best1RM = useMemo(() => {
+    let best = 0;
+    for (const session of appData.sessions) {
+      const entry = session.entries.find((e) => e.exercise === exercise);
+      if (!entry) continue;
+      for (const set of entry.sets) {
+        if (!set.w || !set.r) continue;
+        const e1rm = set.r === 1 ? set.w : set.w * (1 + set.r / 30);
+        if (e1rm > best) best = e1rm;
+      }
+    }
+    return Math.round(best);
+  }, [appData.sessions, exercise]);
 
   const dateRange = filteredSessions.length > 1
     ? `${filteredSessions[0].date} – ${filteredSessions[filteredSessions.length - 1].date}`
@@ -216,7 +243,13 @@ export function ProgressPage() {
     <section className="section-card">
       <header>
         <p className="eyebrow">Progress</p>
-        <h2>Track top-set performance</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <h2 style={{ margin: 0 }}>{metric === 'weight' ? 'Top-set weight' : 'Session volume'}</h2>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button type="button" className={`day-pill${metric === 'weight' ? ' active' : ''}`} onClick={() => setMetric('weight')}>Weight</button>
+            <button type="button" className={`day-pill${metric === 'volume' ? ' active' : ''}`} onClick={() => setMetric('volume')}>Volume</button>
+          </div>
+        </div>
       </header>
 
       <div className="controls-row">
@@ -291,21 +324,41 @@ export function ProgressPage() {
               {dateRange && <span style={{ color: 'var(--muted)', marginLeft: '6px', fontSize: '0.82rem' }}>({dateRange})</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {isNewPB && (
-                <span style={{
-                  background: 'rgba(34, 197, 94, 0.15)',
-                  color: 'var(--ok)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  borderRadius: '999px',
-                  padding: '2px 10px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                }}>
-                  NEW PB
-                </span>
-              )}
-              <span>Top: {maxWeight}kg · Low: {minWeight}kg</span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {isNewPB && (
+                  <span style={{
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    color: 'var(--ok)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    borderRadius: '999px',
+                    padding: '2px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                  }}>
+                    NEW PB
+                  </span>
+                )}
+                {metric === 'weight' && best1RM > 0 && (
+                  <span style={{
+                    background: 'rgba(74, 143, 232, 0.1)',
+                    color: 'var(--accent)',
+                    border: '1px solid rgba(74, 143, 232, 0.25)',
+                    borderRadius: '999px',
+                    padding: '2px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                  }}>
+                    est. 1RM {best1RM}kg
+                  </span>
+                )}
+              </div>
+              <span>
+                {metric === 'weight'
+                  ? `Top: ${maxVal}kg · Low: ${minVal}kg`
+                  : `Max: ${maxVal.toLocaleString()} kg · Min: ${minVal.toLocaleString()} kg`
+                }
+              </span>
             </div>
           </div>
           <svg viewBox="0 0 200 100" preserveAspectRatio="none" className="chart-svg">
@@ -315,10 +368,10 @@ export function ProgressPage() {
             ))}
             {/* y-axis labels */}
             <text x="6" y="10" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {maxWeight}kg
+              {formatVal(maxVal, metric)}
             </text>
             <text x="6" y="96" fontSize="4" fill="var(--muted)" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {minWeight}kg
+              {formatVal(minVal, metric)}
             </text>
             {/* gradient fill under the line */}
             <defs>
@@ -348,7 +401,7 @@ export function ProgressPage() {
             {chartPoints.map((point, i) => {
               const isFirst = i === 0;
               const isLast = i === chartPoints.length - 1;
-              const isPeak = point.value === maxWeight;
+              const isPeak = point.value === maxVal;
               const showLabel = isFirst || isLast || isPeak;
               return (
                 <g key={point.date}>
@@ -362,7 +415,7 @@ export function ProgressPage() {
                       fill="var(--ink)"
                       style={{ fontVariantNumeric: 'tabular-nums' }}
                     >
-                      {point.value}kg
+                      {formatVal(point.value, metric)}
                     </text>
                   )}
                 </g>
@@ -378,7 +431,11 @@ export function ProgressPage() {
                     <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#f59e0b', fontWeight: 600 }}>incomplete</span>
                   )}
                 </div>
-                <div>{getTopWeight(session, exercise)}kg</div>
+                <div>
+                  {metric === 'volume'
+                    ? `${getSessionVolume(session, exercise).toLocaleString()} kg`
+                    : `${getTopWeight(session, exercise)}kg`}
+                </div>
               </div>
             ))}
           </div>

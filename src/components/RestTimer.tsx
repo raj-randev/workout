@@ -30,10 +30,24 @@ type Props = {
   onDismiss: () => void;
 };
 
+import { useEffect, useRef, useState } from 'react';
+
 export function RestTimer({ seconds, total, context, onStart, onDismiss }: Props) {
   const isBetweenSets = context ? !context.isLastSet : false;
   const presets = isBetweenSets ? SET_PRESETS : EXERCISE_PRESETS;
   const isDone = seconds <= 0;
+
+  const [autoDismissIn, setAutoDismissIn] = useState<number | null>(null);
+  const dismissRef = useRef(onDismiss);
+  useEffect(() => { dismissRef.current = onDismiss; });
+
+  useEffect(() => {
+    if (!isDone) { setAutoDismissIn(null); return; }
+    setAutoDismissIn(3);
+    const iv = window.setInterval(() => setAutoDismissIn((p) => (p !== null && p > 1 ? p - 1 : null)), 1000);
+    const to = window.setTimeout(() => dismissRef.current(), 3000);
+    return () => { window.clearInterval(iv); window.clearTimeout(to); };
+  }, [isDone]);
   const isUrgent = !isDone && seconds <= 10;
   const fraction = total > 0 ? Math.max(0, seconds) / total : 0;
   const dashOffset = CIRCUMFERENCE * (1 - fraction);
@@ -108,7 +122,10 @@ export function RestTimer({ seconds, total, context, onStart, onDismiss }: Props
           style={{ width: '100%', minHeight: '52px', fontSize: '1rem', marginTop: '4px' }}
           onClick={isDone ? onDismiss : () => onStart(total)}
         >
-          {isDone ? 'Continue' : '↺  Restart'}
+          {isDone
+            ? autoDismissIn !== null ? `Continue (${autoDismissIn})` : 'Continue'
+            : '↺  Restart'
+          }
         </button>
       </div>
     </div>
