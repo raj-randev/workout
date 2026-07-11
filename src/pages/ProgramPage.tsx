@@ -141,58 +141,56 @@ export function ProgramPage() {
             </button>
           </div>
 
-          {/* Column headers */}
-          {session.exercises.length > 0 && (
-            <div className="program-col-headers">
-              <span className="program-col-exercise">Exercise</span>
-              <span className="program-col-sets">Sets</span>
-              <span className="program-col-rest">Set rest</span>
-            </div>
-          )}
-
           {/* Exercise rows */}
           {session.exercises.map((ex, eIdx) => (
             <div key={eIdx} className="program-exercise-row">
-              <div className="program-move-btns">
+              <div className="program-ex-top">
+                <div className="program-move-btns">
+                  <button
+                    type="button"
+                    disabled={eIdx === 0}
+                    onClick={() => moveExercise(sIdx, eIdx, -1)}
+                  >↑</button>
+                  <button
+                    type="button"
+                    disabled={eIdx === session.exercises.length - 1}
+                    onClick={() => moveExercise(sIdx, eIdx, 1)}
+                  >↓</button>
+                </div>
+                <span className="program-ex-name">{ex.name}</span>
                 <button
                   type="button"
-                  disabled={eIdx === 0}
-                  onClick={() => moveExercise(sIdx, eIdx, -1)}
-                >↑</button>
-                <button
-                  type="button"
-                  disabled={eIdx === session.exercises.length - 1}
-                  onClick={() => moveExercise(sIdx, eIdx, 1)}
-                >↓</button>
+                  className="program-ex-del"
+                  onClick={() => removeExercise(sIdx, eIdx)}
+                >×</button>
               </div>
-              <span className="program-ex-name">{ex.name}</span>
-              <div className="program-sets-stepper">
-                <button
-                  type="button"
-                  disabled={ex.sets <= 1}
-                  onClick={() => updateExercise(sIdx, eIdx, { sets: ex.sets - 1 })}
-                >−</button>
-                <span>{ex.sets}</span>
-                <button
-                  type="button"
-                  disabled={ex.sets >= 10}
-                  onClick={() => updateExercise(sIdx, eIdx, { sets: ex.sets + 1 })}
-                >+</button>
+              <div className="program-ex-bottom">
+                <div className="program-sets-stepper">
+                  <button
+                    type="button"
+                    disabled={ex.sets <= 1}
+                    onClick={() => updateExercise(sIdx, eIdx, { sets: ex.sets - 1 })}
+                  >−</button>
+                  <span>{ex.sets} sets</span>
+                  <button
+                    type="button"
+                    disabled={ex.sets >= 10}
+                    onClick={() => updateExercise(sIdx, eIdx, { sets: ex.sets + 1 })}
+                  >+</button>
+                </div>
+                <div className="program-rest-pill">
+                  <span className="program-rest-label-text">rest</span>
+                  <select
+                    className="program-rest-select"
+                    value={ex.restSeconds}
+                    onChange={(e) => updateExercise(sIdx, eIdx, { restSeconds: Number(e.target.value) })}
+                  >
+                    {REST_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <select
-                className="program-rest-select"
-                value={ex.restSeconds}
-                onChange={(e) => updateExercise(sIdx, eIdx, { restSeconds: Number(e.target.value) })}
-              >
-                {REST_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="program-ex-del"
-                onClick={() => removeExercise(sIdx, eIdx)}
-              >×</button>
             </div>
           ))}
 
@@ -238,7 +236,7 @@ export function ProgramPage() {
             onKeyDown={(e) => { if (e.key === 'Enter') addSession(); }}
           />
           <select
-            className="program-rest-select"
+            className="program-type-select"
             value={newSession.type}
             onChange={(e) => setNewSession((prev) => ({ ...prev, type: e.target.value as 'upper' | 'lower' }))}
           >

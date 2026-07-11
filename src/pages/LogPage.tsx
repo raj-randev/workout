@@ -12,6 +12,12 @@ function formatShortDate(iso: string) {
   return `${months[Number(m) - 1]} ${Number(d)}`;
 }
 
+function formatElapsed(secs: number) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function compareSessionDate(a: Session, b: Session) {
   return a.date.localeCompare(b.date);
 }
@@ -88,6 +94,11 @@ export function LogPage() {
   const touchStartY = useRef(0);
   const exerciseRefs = useRef<Map<string, HTMLElement>>(new Map());
   const autoSaveTimerRef = useRef<number | null>(null);
+  const sessionStartRef = useRef<number | null>(null);
+  const [elapsedSecs, setElapsedSecs] = useState(0);
+  const [swipedSetKey, setSwipedSetKey] = useState<string | null>(null);
+  const swipeSetStartX = useRef(0);
+  const [showFinishModal, setShowFinishModal] = useState(false);
 
   useEffect(() => {
     void loadAppDataAsync().then(({ data }) => setAppData(data));
@@ -141,6 +152,19 @@ export function LogPage() {
     return () => { if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current); };
   }, [draftSession, isLocked, selectedDate, selectedDay]);
 
+  useEffect(() => {
+    if (!selectedDate || !selectedDay || isLocked) {
+      sessionStartRef.current = null;
+      setElapsedSecs(0);
+      return;
+    }
+    if (sessionStartRef.current === null) sessionStartRef.current = Date.now();
+    const iv = window.setInterval(() => {
+      setElapsedSecs(Math.floor((Date.now() - sessionStartRef.current!) / 1000));
+    }, 1000);
+    return () => window.clearInterval(iv);
+  }, [selectedDate, selectedDay, isLocked]);
+
   const recentSessions = [...appData.sessions]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 7);
@@ -163,6 +187,25 @@ export function LogPage() {
         sets: s.entries.find((e) => e.exercise === historyExercise)?.sets ?? [],
       }));
   }, [historyExercise, appData.sessions]);
+
+  const personalBests = useMemo(() => {
+    if (!draftSession || !selectedDate) return [];
+    const result: { exercise: string; current: number; prev: number | null }[] = [];
+    for (const entry of draftSession.entries) {
+      const currentMax = entry.sets.reduce((max, s) => s.w > 0 ? Math.max(max, s.w) : max, 0);
+      if (currentMax <= 0) continue;
+      const historicalMax = appData.sessions
+        .filter((s) => s.date < selectedDate)
+        .flatMap((s) => s.entries)
+        .filter((e) => e.exercise === entry.exercise)
+        .flatMap((e) => e.sets)
+        .reduce((max, s) => Math.max(max, s.w), 0);
+      if (currentMax > historicalMax) {
+        result.push({ exercise: entry.exercise, current: currentMax, prev: historicalMax > 0 ? historicalMax : null });
+      }
+    }
+    return result;
+  }, [draftSession, selectedDate, appData.sessions]);
 
   const selectedProgram = selectedDay ? (appData.program?.find((s) => s.name === selectedDay) ?? null) : null;
   const isUpperDay = selectedProgram?.type === 'upper';
@@ -508,6 +551,7 @@ export function LogPage() {
             <div className="exercise-grid">
               {draftSession.entries.map((entry) => {
                 const repRange = getRepRange(entry.exercise, selectedDay, appData);
+                const priorEntry = priorSession?.entries.find((e) => e.exercise === entry.exercise);
                 return (
                   <article
                     className="exercise-card"
@@ -539,29 +583,66 @@ export function LogPage() {
                       </div>
                     </header>
                     <div className="card-body">
-                      {entry.sets.map((set, i) => (
-                        <button
-                          key={`${entry.exercise}-${i}`}
-                          type="button"
-                          className={`set-display-row${!isLocked ? ' set-display-row--tap' : ''}`}
-                          disabled={isLocked}
-                          onClick={() => setSetPopup({ exercise: entry.exercise, setIndex: i })}
-                        >
-                          <div className="set-display-cell">
-                            <span className="set-display-label">Weight</span>
-                            <span className="set-display-value">{set.w || 0}</span>
+                      {entry.sets.map((set, i) => {
+                        const rowKey = `${entry.exercise}-${i}`;
+                        const isSwiped = swipedSetKey === rowKey;
+                        const priorRowSet = priorEntry?.sets[i];
+                        return (
+                          <div
+                            key={rowKey}
+                            className="set-row-swipe-wrap"
+                            onTouchStart={(e) => { swipeSetStartX.current = e.touches[0].clientX; }}
+                            onTouchEnd={(e) => {
+                              const dx = e.changedTouches[0].clientX - swipeSetStartX.current;
+                              if (dx < -60) { e.stopPropagation(); setSwipedSetKey(rowKey); }
+                              else if (dx > 20) setSwipedSetKey(null);
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className={`set-display-row${!isLocked ? ' set-display-row--tap' : ''}${isSwiped ? ' swiped' : ''}`}
+                              disabled={isLocked}
+                              onClick={() => {
+                                if (isSwiped) { setSwipedSetKey(null); return; }
+                                setSetPopup({ exercise: entry.exercise, setIndex: i });
+                              }}
+                            >
+                              <div className="set-display-cell">
+                                <span className="set-display-label">Weight</span>
+                                <span className="set-display-value">{set.w || 0}</span>
+                              </div>
+                              <div className="set-display-cell">
+                                <span className="set-display-label">Reps</span>
+                                <span className="set-display-value">{set.r || 0}</span>
+                              </div>
+                              <div className="set-display-cell">
+                                <span className="set-display-label">Effort</span>
+                                <span className="set-display-value">{set.e ?? '—'}</span>
+                              </div>
+                              <span className="set-display-index">
+                                S{i + 1}
+                                {priorRowSet && (priorRowSet.w > 0 || priorRowSet.r > 0) && !isLocked && (
+                                  <span className="set-prior-hint">{priorRowSet.w}×{priorRowSet.r}</span>
+                                )}
+                              </span>
+                            </button>
+                            {isSwiped && !isLocked && (
+                              <button
+                                type="button"
+                                className="set-clear-btn"
+                                onClick={() => {
+                                  updateEntry(entry.exercise, i, 'w', '0');
+                                  updateEntry(entry.exercise, i, 'r', '0');
+                                  updateEntry(entry.exercise, i, 'e', '');
+                                  setSwipedSetKey(null);
+                                }}
+                              >
+                                Clear
+                              </button>
+                            )}
                           </div>
-                          <div className="set-display-cell">
-                            <span className="set-display-label">Reps</span>
-                            <span className="set-display-value">{set.r || 0}</span>
-                          </div>
-                          <div className="set-display-cell">
-                            <span className="set-display-label">Effort</span>
-                            <span className="set-display-value">{set.e ?? '—'}</span>
-                          </div>
-                          <span className="set-display-index">S{i + 1}</span>
-                        </button>
-                      ))}
+                        );
+                      })}
                       <button
                         type="button"
                         onClick={() => toggleNotes(entry.exercise)}
@@ -614,22 +695,17 @@ export function LogPage() {
               })}
             </div>
 
+            {!isLocked && elapsedSecs > 0 && (
+              <div className="session-elapsed">
+                <span className="session-elapsed-time">{formatElapsed(elapsedSecs)}</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginTop: '18px' }}>
               {!isLocked && (
-                <>
-                  <button className="button-primary" type="button" onClick={persistSession}>
-                    Save session
-                  </button>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', userSelect: 'none' }}>
-                    <input
-                      type="checkbox"
-                      checked={isPartial}
-                      onChange={(e) => setIsPartial(e.target.checked)}
-                      style={{ width: '16px', height: '16px', accentColor: '#f59e0b', cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Mark as incomplete</span>
-                  </label>
-                </>
+                <button className="button-primary" type="button" style={{ minHeight: '52px', fontSize: '1.05rem', flex: 1 }} onClick={() => setShowFinishModal(true)}>
+                  Finish workout
+                </button>
               )}
               <button className="button-pill" type="button" onClick={copyForClaude}>
                 Copy for Claude
@@ -804,11 +880,30 @@ export function LogPage() {
           }));
           setSetPopup(null);
         }
+        const ps = popupSet!;
+        const sp = setPopup!;
+        function stepVal(key: 'w' | 'r' | 'e', delta: number) {
+          const cur = key === 'e' ? (ps.e ?? 7) : ps[key];
+          let next = Math.round((cur + delta) * 10) / 10;
+          if (key === 'w') next = Math.max(0, next);
+          if (key === 'r') next = Math.max(0, Math.round(next));
+          if (key === 'e') next = Math.min(10, Math.max(1, Math.round(next)));
+          updateEntry(sp.exercise, sp.setIndex, key, String(next));
+        }
+        function usePriorSet() {
+          if (!priorSet) return;
+          updateEntry(sp.exercise, sp.setIndex, 'w', String(priorSet.w));
+          updateEntry(sp.exercise, sp.setIndex, 'r', String(priorSet.r));
+          if (priorSet.e !== null) updateEntry(sp.exercise, sp.setIndex, 'e', String(priorSet.e));
+        }
+
         return (
           <div className="bottom-sheet-overlay" onClick={closePopup}>
             <div className="set-popup" onClick={(e) => e.stopPropagation()}>
               <div className="set-popup-handle" />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     {setPopup.exercise}
@@ -825,52 +920,77 @@ export function LogPage() {
                   ×
                 </button>
               </div>
+
+              {/* Prior session hint */}
               {priorSet && (
-                <p style={{ margin: '6px 0 14px', color: 'var(--muted)', fontSize: '0.82rem' }}>
-                  Last session: {priorSet.w}kg × {priorSet.r}{priorSet.e !== null ? ` @ ${priorSet.e}` : ''}
-                </p>
+                <div className="prior-set-card">
+                  <div>
+                    <div className="prior-set-label">Last session</div>
+                    <div className="prior-set-value">
+                      {priorSet.w}kg × {priorSet.r}{priorSet.e !== null ? ` @ ${priorSet.e}` : ''}
+                    </div>
+                  </div>
+                  <button type="button" className="prior-set-use-btn" onClick={usePriorSet}>
+                    Use last →
+                  </button>
+                </div>
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <label>
-                  Weight (kg)
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    value={popupSet.w}
-                    autoFocus
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'w', e.target.value)}
-                    style={{ fontSize: '1.2rem', textAlign: 'center', padding: '14px 8px' }}
-                  />
-                </label>
-                <label>
-                  Reps
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    value={popupSet.r}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'r', e.target.value)}
-                    style={{ fontSize: '1.2rem', textAlign: 'center', padding: '14px 8px' }}
-                  />
-                </label>
-                <label>
-                  Effort <span style={{ fontSize: '0.65rem', color: 'var(--muted)', fontWeight: 400 }}>1–10</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min="1"
-                    max="10"
-                    value={popupSet.e ?? ''}
-                    placeholder="—"
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'e', e.target.value)}
-                    style={{ fontSize: '1.2rem', textAlign: 'center', padding: '14px 8px' }}
-                  />
-                </label>
+
+              {/* Steppers */}
+              <div className="set-popup-steppers">
+                <div className="stepper-row">
+                  <span className="stepper-label">Weight</span>
+                  <div className="stepper-controls">
+                    <button type="button" className="stepper-btn" onClick={() => stepVal('w', -2.5)}>−</button>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      className="stepper-input"
+                      value={popupSet.w || ''}
+                      placeholder="0"
+                      autoFocus
+                      onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'w', e.target.value)}
+                    />
+                    <button type="button" className="stepper-btn" onClick={() => stepVal('w', 2.5)}>+</button>
+                  </div>
+                  <span className="stepper-unit">kg</span>
+                </div>
+
+                <div className="stepper-row">
+                  <span className="stepper-label">Reps</span>
+                  <div className="stepper-controls">
+                    <button type="button" className="stepper-btn" onClick={() => stepVal('r', -1)}>−</button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      className="stepper-input"
+                      value={popupSet.r || ''}
+                      placeholder="0"
+                      onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'r', e.target.value)}
+                    />
+                    <button type="button" className="stepper-btn" onClick={() => stepVal('r', 1)}>+</button>
+                  </div>
+                </div>
+
+                <div className="stepper-row">
+                  <span className="stepper-label">Effort</span>
+                  <div className="stepper-controls">
+                    <button type="button" className="stepper-btn" onClick={() => stepVal('e', -1)}>−</button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      className="stepper-input"
+                      value={popupSet.e ?? ''}
+                      placeholder="—"
+                      onChange={(e) => updateEntry(setPopup.exercise, setPopup.setIndex, 'e', e.target.value)}
+                    />
+                    <button type="button" className="stepper-btn" onClick={() => stepVal('e', 1)}>+</button>
+                  </div>
+                  <span className="stepper-unit">/10</span>
+                </div>
               </div>
+
+              {/* Copy from previous set in this session */}
               {prevSet && (prevSet.w || prevSet.r) ? (
                 <button
                   type="button"
@@ -878,9 +998,10 @@ export function LogPage() {
                   style={{ width: '100%', marginBottom: '12px', fontSize: '0.85rem', minHeight: '40px' }}
                   onClick={() => copySetFromPrevious(setPopup.exercise, setPopup.setIndex)}
                 >
-                  Copy from Set {setPopup.setIndex} · {prevSet.w}kg × {prevSet.r}
+                  Copy Set {setPopup.setIndex} · {prevSet.w}kg × {prevSet.r}
                 </button>
               ) : null}
+
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" className="button-pill" style={{ flex: 1 }} onClick={closePopup}>
                   Done
@@ -896,6 +1017,7 @@ export function LogPage() {
                       window.dispatchEvent(new CustomEvent('rest-timer-start', {
                         detail: { exercise: setPopup.exercise, isLastSet: false, restSeconds },
                       }));
+                      setSwipedSetKey(null);
                       setSetPopup({ exercise: setPopup.exercise, setIndex: setPopup.setIndex + 1 });
                     }}
                   >
@@ -907,6 +1029,75 @@ export function LogPage() {
           </div>
         );
       })()}
+
+      {/* ── Finish workout modal ─────────────────────── */}
+      {showFinishModal && draftSession && (
+        <div className="modal-overlay">
+          <div className="modal-panel" style={{ maxWidth: '400px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '2.4rem', marginBottom: '6px' }}>💪</div>
+              <h3 style={{ margin: 0 }}>Workout complete</h3>
+            </div>
+            <div className="finish-modal-stats">
+              <div className="finish-modal-stat">
+                <div className="finish-modal-stat-value">{formatElapsed(elapsedSecs)}</div>
+                <div className="finish-modal-stat-label">Duration</div>
+              </div>
+              <div className="finish-modal-stat">
+                <div className="finish-modal-stat-value">
+                  {calcVolume(draftSession) >= 1000
+                    ? `${(calcVolume(draftSession) / 1000).toFixed(1)}k`
+                    : String(calcVolume(draftSession))}
+                </div>
+                <div className="finish-modal-stat-label">kg lifted</div>
+              </div>
+              <div className="finish-modal-stat">
+                <div className="finish-modal-stat-value">
+                  {draftSession.entries.reduce((n, e) => n + e.sets.filter((s) => s.w > 0 || s.r > 0).length, 0)}
+                </div>
+                <div className="finish-modal-stat-label">Sets done</div>
+              </div>
+            </div>
+            {personalBests.length > 0 && (
+              <div className="finish-modal-prs">
+                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+                  Personal bests
+                </p>
+                {personalBests.map((pb) => (
+                  <div key={pb.exercise} className="finish-modal-pr-item">
+                    <span className="finish-modal-pr-badge">{pb.prev ? 'PB' : 'FIRST'}</span>
+                    <span style={{ flex: 1, color: 'var(--ink)', fontWeight: 500, fontSize: '0.9rem' }}>{pb.exercise}</span>
+                    <span style={{ color: 'var(--ok)', fontWeight: 700 }}>{pb.current}kg</span>
+                    {pb.prev && <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>was {pb.prev}kg</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={isPartial}
+                onChange={(e) => setIsPartial(e.target.checked)}
+                style={{ width: '16px', height: '16px', accentColor: '#f59e0b', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Mark as incomplete</span>
+            </label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="button-pill" style={{ flex: 1 }} onClick={() => setShowFinishModal(false)}>
+                Back
+              </button>
+              <button
+                type="button"
+                className="button-primary"
+                style={{ flex: 2 }}
+                onClick={() => { setShowFinishModal(false); persistSession(); }}
+              >
+                Save & finish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Exercise history drawer ──────────────────── */}
       {historyExercise && (
