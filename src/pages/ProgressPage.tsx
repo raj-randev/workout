@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DAYS } from '../data/days';
 import { loadAppDataAsync } from '../storage';
-import type { Session } from '../types';
+import type { AppData, Session } from '../types';
 
 const rangeOptions = ['1W', '1M', '3M', '6M', '1Y', 'All'] as const;
 
@@ -32,7 +31,7 @@ function getTopWeight(session: Session, exercise: string) {
 export function ProgressPage() {
   const [exercise, setExercise] = useState('Leg Press');
   const [range, setRange] = useState<typeof rangeOptions[number]>('1M');
-  const [appData, setAppData] = useState<{ sessions: Session[]; custom: any[] }>({ sessions: [], custom: [] });
+  const [appData, setAppData] = useState<AppData>({ sessions: [], custom: [] });
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -66,18 +65,19 @@ export function ProgressPage() {
     const q = exerciseSearch.toLowerCase().trim();
     const lower = new Set<string>();
     const upper = new Set<string>();
-    Object.entries(DAYS).forEach(([day, exercises]) => {
-      const isUpper = day.startsWith('Upper');
-      exercises.forEach(([name]) => {
-        if (!q || name.toLowerCase().includes(q)) (isUpper ? upper : lower).add(name);
+    (appData.program ?? []).forEach((session) => {
+      const bucket = session.type === 'upper' ? upper : lower;
+      session.exercises.forEach(({ name }) => {
+        if (!q || name.toLowerCase().includes(q)) bucket.add(name);
       });
     });
+    // Also include any custom exercises not in program
     appData.custom.forEach((c) => {
       const isUpper = c.day.startsWith('Upper');
       if (!q || c.name.toLowerCase().includes(q)) (isUpper ? upper : lower).add(c.name);
     });
     return { Lower: Array.from(lower).sort(), Upper: Array.from(upper).sort() };
-  }, [exerciseSearch, appData.custom]);
+  }, [exerciseSearch, appData.program, appData.custom]);
 
   const filteredSessions = useMemo(() => {
     const cutoff = getCutoffDate(range);

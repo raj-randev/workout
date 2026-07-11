@@ -19,6 +19,7 @@ export type TimerContext = {
   exercise: string;
   isLastSet: boolean;
   nextExercise?: string;
+  restSeconds?: number;
 };
 
 type Props = {

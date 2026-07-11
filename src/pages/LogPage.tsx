@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DAYS } from '../data/days';
 import { addCustomExercise, clearDraftSession, createSessionDraft, deleteSession, findSession, loadAppDataAsync, loadDraftSession, removeCustomExercise, saveAppData, saveDraftSession } from '../storage';
 import type { AppData, DayName, Session, SetEntry } from '../types';
-
-const dayNames: DayName[] = ['Lower A', 'Upper A', 'Lower B', 'Upper B'];
 
 function formatDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -42,8 +39,8 @@ function getPriorSet(exercise: string, setIndex: number, day: DayName, date: str
 }
 
 function getRepRange(exercise: string, day: DayName, data: AppData): string | null {
-  const found = DAYS[day].find(([name]) => name === exercise);
-  if (found) return found[2];
+  const sessionProg = data.program?.find((s) => s.name === day);
+  if (sessionProg) return sessionProg.exercises.find((e) => e.name === exercise)?.reps ?? null;
   return data.custom.find((c) => c.name === exercise && c.day === day)?.reps ?? null;
 }
 
@@ -77,7 +74,7 @@ export function LogPage() {
   const [appData, setAppData] = useState<AppData>({ sessions: [], custom: [] });
   const [draftSession, setDraftSession] = useState<Session | null>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
-  const [customForm, setCustomForm] = useState({ name: '', day: 'Lower A' as DayName, sets: 3, reps: '10–12' });
+  const [customForm, setCustomForm] = useState({ name: '', day: 'Lower A', sets: 3, reps: '10–12' });
   const [customError, setCustomError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
@@ -112,7 +109,7 @@ export function LogPage() {
     if (stored) { setDraftSession(stored); return; }
     // Restore auto-saved draft if one exists for this date/day
     const draft = loadDraftSession(selectedDate, selectedDay);
-    setDraftSession(draft ?? createSessionDraft(selectedDate, selectedDay, appData.custom));
+    setDraftSession(draft ?? createSessionDraft(selectedDate, selectedDay, appData));
   }, [selectedDate, selectedDay, appData]);
 
   // Scroll to next exercise when rest-timer-done fires
@@ -166,7 +163,8 @@ export function LogPage() {
       }));
   }, [historyExercise, appData.sessions]);
 
-  const isUpperDay = selectedDay?.startsWith('Upper') ?? false;
+  const selectedProgram = selectedDay ? (appData.program?.find((s) => s.name === selectedDay) ?? null) : null;
+  const isUpperDay = selectedProgram?.type === 'upper';
   const dayColor = isUpperDay ? 'var(--upper)' : 'var(--lower)';
 
   function showToast(msg: string) {
@@ -295,7 +293,7 @@ export function LogPage() {
     const nextData = deleteSession(selectedDate, selectedDay, appData);
     setAppData(nextData);
     saveAppData(nextData);
-    setDraftSession(createSessionDraft(selectedDate, selectedDay, nextData.custom));
+    setDraftSession(createSessionDraft(selectedDate, selectedDay, nextData));
     showToast('Session deleted');
   }
 
@@ -437,16 +435,16 @@ export function LogPage() {
         {/* Day pills */}
         {selectedDate && (
           <div className="day-pills">
-            {dayNames.map((day) => (
+            {(appData.program ?? []).map((session) => (
               <button
-                key={day}
+                key={session.name}
                 type="button"
-                className={`day-pill ${day === selectedDay ? 'active' : ''}`}
-                disabled={selectedDay !== null && day !== selectedDay}
-                onClick={() => handleDaySelect(day)}
+                className={`day-pill ${session.type} ${session.name === selectedDay ? 'active' : ''}`}
+                disabled={selectedDay !== null && session.name !== selectedDay}
+                onClick={() => handleDaySelect(session.name)}
               >
-                {day}
-                {day === selectedDay && !isLocked && (
+                {session.name}
+                {session.name === selectedDay && !isLocked && (
                   <span className="day-pill-clear" aria-hidden="true">×</span>
                 )}
               </button>
@@ -660,7 +658,7 @@ export function LogPage() {
           </p>
         ) : (
           <div style={{ display: 'grid', gap: '12px' }}>
-            {dayNames.map((day) => {
+            {(appData.program ?? []).map(({ name: day }) => {
               const exercises = appData.custom.filter((e) => e.day === day);
               if (!exercises.length) return null;
               return (
@@ -712,10 +710,10 @@ export function LogPage() {
                 Day
                 <select
                   value={customForm.day}
-                  onChange={(e) => setCustomForm((prev) => ({ ...prev, day: e.target.value as DayName }))}
+                  onChange={(e) => setCustomForm((prev) => ({ ...prev, day: e.target.value }))}
                 >
-                  {dayNames.map((day) => (
-                    <option key={day} value={day}>{day}</option>
+                  {(appData.program ?? []).map((s) => (
+                    <option key={s.name} value={s.name}>{s.name}</option>
                   ))}
                 </select>
               </label>
@@ -795,8 +793,10 @@ export function LogPage() {
           const exerciseIndex = session.entries.findIndex((e) => e.exercise === popup.exercise);
           const isLastSet = popup.setIndex === totalSets - 1;
           const nextExercise = isLastSet ? session.entries[exerciseIndex + 1]?.exercise : undefined;
+          const sessionProg = appData.program?.find((s) => s.name === selectedDay);
+          const restSeconds = sessionProg?.exercises.find((e) => e.name === popup.exercise)?.restSeconds;
           window.dispatchEvent(new CustomEvent('rest-timer-start', {
-            detail: { exercise: popup.exercise, isLastSet, nextExercise },
+            detail: { exercise: popup.exercise, isLastSet, nextExercise, restSeconds },
           }));
           setSetPopup(null);
         }
@@ -887,8 +887,10 @@ export function LogPage() {
                     className="button-primary"
                     style={{ flex: 2 }}
                     onClick={() => {
+                      const sessionProg = appData.program?.find((s) => s.name === selectedDay);
+                      const restSeconds = sessionProg?.exercises.find((e) => e.name === setPopup.exercise)?.restSeconds;
                       window.dispatchEvent(new CustomEvent('rest-timer-start', {
-                        detail: { exercise: setPopup.exercise, isLastSet: false },
+                        detail: { exercise: setPopup.exercise, isLastSet: false, restSeconds },
                       }));
                       setSetPopup({ exercise: setPopup.exercise, setIndex: setPopup.setIndex + 1 });
                     }}

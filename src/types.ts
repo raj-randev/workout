@@ -1,4 +1,4 @@
-export type DayName = 'Lower A' | 'Upper A' | 'Lower B' | 'Upper B';
+export type DayName = string;
 
 export type SetEntry = {
   w: number;
@@ -26,7 +26,21 @@ export type CustomExercise = {
   reps: string;
 };
 
+export type ExerciseProgramEntry = {
+  name: string;
+  sets: number;
+  reps: string;
+  restSeconds: number;
+};
+
+export type SessionProgram = {
+  name: string;
+  type: 'upper' | 'lower';
+  exercises: ExerciseProgramEntry[];
+};
+
 export type AppData = {
   sessions: Session[];
   custom: CustomExercise[];
+  program?: SessionProgram[];
 };

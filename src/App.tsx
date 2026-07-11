@@ -6,6 +6,7 @@ import { RestTimer } from './components/RestTimer';
 import type { TimerContext } from './components/RestTimer';
 import { FormPage } from './pages/FormPage';
 import { LogPage } from './pages/LogPage';
+import { ProgramPage } from './pages/ProgramPage';
 import { ProgressPage } from './pages/ProgressPage';
 import { loadAppDataAsync } from './storage';
 import type { AppData } from './types';
@@ -13,6 +14,7 @@ import type { AppData } from './types';
 const tabs = [
   { path: '/', label: 'Log' },
   { path: '/progress', label: 'Progress' },
+  { path: '/program', label: 'Program' },
   { path: '/form', label: 'Form' },
 ];
 
@@ -75,7 +77,7 @@ function App() {
       } : null;
       setRestContext(ctx);
       const isBetweenSets = ctx ? !ctx.isLastSet : false;
-      const duration = isBetweenSets ? setRestDuration : exerciseRestDuration;
+      const duration = detail.restSeconds ?? (isBetweenSets ? setRestDuration : exerciseRestDuration);
       setRestTimer({ seconds: duration, total: duration });
     };
     window.addEventListener('rest-timer-start', handler);
@@ -120,6 +122,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LogPage />} />
           <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/program" element={<ProgramPage />} />
           <Route path="/form" element={<FormPage />} />
         </Routes>
       </main>
