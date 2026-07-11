@@ -65,14 +65,22 @@ export function loadAppData(): AppData {
 }
 
 export async function loadAppDataAsync(): Promise<{ data: AppData; source: 'cloud' | 'local' }> {
+  const localData = loadLocalAppData();
   const cloudData = await loadAppDataFromCloud();
+
   if (cloudData) {
-    // Ensure program is initialized even on cloud data
     if (!cloudData.program) cloudData.program = initializeProgram(cloudData);
-    persistLocalAppData(cloudData);
-    return { data: cloudData, source: 'cloud' };
+    // Only trust cloud data if it is at least as complete as local.
+    // This prevents an expired/empty cloud record from silently wiping localStorage.
+    if (cloudData.sessions.length >= localData.sessions.length) {
+      persistLocalAppData(cloudData);
+      return { data: cloudData, source: 'cloud' };
+    }
+    // Local is richer — push it up to cloud and continue with local.
+    void saveAppDataToCloud(localData);
   }
-  return { data: loadLocalAppData(), source: 'local' };
+
+  return { data: localData, source: 'local' };
 }
 
 export function saveAppData(data: AppData) {
