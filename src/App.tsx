@@ -51,7 +51,7 @@ function App() {
   // When timer hits 0: notification only
   useEffect(() => {
     if (restTimer?.seconds !== 0) return;
-    if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
       new Notification('Rest done!', {
         body: restContext?.nextExercise
           ? `Next up: ${restContext.nextExercise}`
@@ -65,7 +65,7 @@ function App() {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<Partial<TimerContext>>).detail ?? {};
-      if (Notification.permission === 'default') {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
         void Notification.requestPermission();
       }
       const ctx: TimerContext | null = detail.exercise ? {
