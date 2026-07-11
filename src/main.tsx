@@ -5,12 +5,19 @@ import App from './App';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
 
+// Reload when a new service worker takes control so fresh assets are used.
+// This is especially important on iOS Safari PWA which won't auto-reload.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
 const updateServiceWorker = registerSW({
-  onOfflineReady() {
-    console.log('PWA ready for offline use.');
-  },
+  onOfflineReady() {},
   onNeedRefresh() {
-    console.log('New content is available.');
+    // Immediately apply the waiting service worker and reload.
+    void updateServiceWorker(true);
   },
 });
 
